@@ -153,7 +153,8 @@ def gerar_qrcode(order):
     pasta = "qr_codes"
     os.makedirs(pasta, exist_ok=True)
 
-    link = f"http://127.0.0.1:6061/motoboy/scan/{order.qr_token}"
+    base_url = os.environ.get("BASE_URL", "http://127.0.0.1:6061")
+    link = f"{base_url}/motoboy/scan/{order.qr_token}"
 
     img = qrcode.make(link)
     caminho = os.path.join(pasta, f"pedido_{order.id}.png")
