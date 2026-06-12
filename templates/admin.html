@@ -146,6 +146,17 @@
 <iframe id="printFrame" style="display:none;"></iframe>
 
 <script>
+function imprimirIframe(url) {
+    const frame = document.getElementById("printFrame");
+
+    frame.src = url;
+
+    frame.onload = function () {
+        frame.contentWindow.focus();
+        frame.contentWindow.print();
+    };
+}
+
 function copiarMensagem(numero, cliente, token) {
     const link = window.location.origin + "/rastreio/" + token;
 
