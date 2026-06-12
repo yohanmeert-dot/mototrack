@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>MotoTrack - Mapa</title>
+
+    <link rel="stylesheet" href="/static/style.css">
+
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet/dist/leaflet.css"
+    />
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+</head>
+<body>
+    <header>
+        <h1>MotoTrack - Mapa dos Motoboys</h1>
+        <a href="/admin">Voltar</a>
+    </header>
+
+    <main>
+        <section class="card">
+            <h2>Localização em tempo real</h2>
+            <p>O mapa atualiza automaticamente a cada 5 segundos.</p>
+
+            <div id="map"></div>
+        </section>
+    </main>
+
+    <script>
+        const map = L.map("map").setView([-25.095, -50.161], 13);
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19
+        }).addTo(map);
+
+        const markers = {};
+
+        async function carregarLocalizacoes() {
+            try {
+                const resposta = await fetch("/api/admin/locations");
+                const dados = await resposta.json();
+
+                if (!dados.success) return;
+
+                dados.drivers.forEach(driver => {
+                    const posicao = [driver.latitude, driver.longitude];
+
+                    const popup = `
+                        <strong>${driver.driver_name}</strong><br>
+                        Última atualização: ${driver.horario}
+                    `;
+
+                    if (markers[driver.driver_id]) {
+                        markers[driver.driver_id].setLatLng(posicao);
+                        markers[driver.driver_id].setPopupContent(popup);
+                    } else {
+                        markers[driver.driver_id] = L.marker(posicao)
+                            .addTo(map)
+                            .bindPopup(popup);
+                    }
+                });
+
+                if (dados.drivers.length > 0) {
+                    const ultimo = dados.drivers[0];
+                    map.setView([ultimo.latitude, ultimo.longitude], 14);
+                }
+
+            } catch (erro) {
+                console.log("Erro ao carregar localizações", erro);
+            }
+        }
+
+        carregarLocalizacoes();
+        setInterval(carregarLocalizacoes, 5000);
+    </script>
+</body>
+</html>

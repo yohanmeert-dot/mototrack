@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>QR Code do Pedido</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <main class="qr-page">
+        <section class="card qr-card">
+            <h1>Pedido #{{ order.numero_pedido }}</h1>
+            <p><strong>Cliente:</strong> {{ order.cliente_nome }}</p>
+            <p><strong>Endereço:</strong> {{ order.endereco }}</p>
+            <p><strong>Status:</strong> {{ order.status }}</p>
+
+            <img src="{{ qr_path }}" class="qr-img">
+
+            <br><br>
+
+            <button onclick="window.print()">Imprimir QR Code</button>
+            <a href="/admin">Voltar</a>
+        </section>
+    </main>
+</body>
+</html>

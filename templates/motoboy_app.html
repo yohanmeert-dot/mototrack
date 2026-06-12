@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>MotoTrack Motoboy</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main class="mobile-page">
+    <section class="card">
+        <h1>MotoTrack Driver</h1>
+        <p><strong>Motoboy:</strong> {{ driver.nome }}</p>
+
+        <button onclick="iniciarGPS()">Iniciar rastreamento</button>
+        <button onclick="pararGPS()">Parar rastreamento</button>
+
+        <p id="statusGps">GPS parado.</p>
+        <p><strong>Última posição:</strong></p>
+        <p id="posicao">---</p>
+    </section>
+</main>
+
+<script>
+const driverId = {{ driver.id }};
+let watchId = null;
+
+function iniciarGPS() {
+    if (!navigator.geolocation) {
+        alert("GPS não disponível neste aparelho.");
+        return;
+    }
+
+    document.getElementById("statusGps").innerText = "Solicitando permissão de GPS...";
+
+    watchId = navigator.geolocation.watchPosition(
+        enviarLocalizacao,
+        erroGPS,
+        {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 10000
+        }
+    );
+}
+
+function pararGPS() {
+    if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+    }
+
+    document.getElementById("statusGps").innerText = "GPS parado.";
+}
+
+function enviarLocalizacao(position) {
+    const lat = position.coords.latitude;
+    const lng = position.coords.longitude;
+
+    document.getElementById("statusGps").innerText = "GPS ativo.";
+    document.getElementById("posicao").innerText = lat + ", " + lng;
+
+    fetch("/api/driver/location", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            driver_id: driverId,
+            latitude: lat,
+            longitude: lng
+        })
+    });
+}
+
+function erroGPS(error) {
+    document.getElementById("statusGps").innerText = "Erro no GPS: " + error.message;
+}
+</script>
+</body>
+</html>

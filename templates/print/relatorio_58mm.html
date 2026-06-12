@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Relatório 58mm</title>
+
+<style>
+@media print {
+    @page {
+        size: 58mm auto;
+        margin: 0;
+    }
+}
+
+body {
+    width: 58mm;
+    margin: 0;
+    padding: 5mm 3mm;
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    color: #000;
+}
+
+.center {
+    text-align: center;
+}
+
+hr {
+    border: none;
+    border-top: 1px dashed #000;
+    margin: 8px 0;
+}
+
+.item {
+    margin-bottom: 8px;
+}
+
+.big {
+    font-size: 15px;
+    font-weight: bold;
+}
+
+.small {
+    font-size: 10px;
+}
+</style>
+</head>
+
+<body onload="window.print()">
+
+<div class="center">
+    <div class="big">MOTOTRACK</div>
+    <div>Relatório do Motoboy</div>
+</div>
+
+<hr>
+
+<div>
+    <strong>Motoboy:</strong><br>
+    {{ driver.nome }}
+</div>
+
+<hr>
+
+{% for entrega in entregas %}
+<div class="item">
+    <strong>Pedido:</strong> #{{ entrega.order.numero_pedido }}<br>
+    <strong>Cliente:</strong> {{ entrega.order.cliente_nome }}<br>
+    <strong>Saída:</strong> {{ entrega.horario_saida.strftime("%H:%M:%S") }}<br>
+    <strong>Taxa:</strong> R$ {{ "%.2f"|format(entrega.order.taxa_entrega) }}
+</div>
+<hr>
+{% endfor %}
+
+<div class="center">
+    <div>Total de entregas: {{ entregas|length }}</div>
+    <div class="big">R$ {{ "%.2f"|format(total_taxas) }}</div>
+</div>
+
+<hr>
+
+<div class="center small">
+    Fechamento MotoTrack
+</div>
+
+</body>
+</html>

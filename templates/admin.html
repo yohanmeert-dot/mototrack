@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>MotoTrack - Admin</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+<header>
+    <h1>MotoTrack</h1>
+    <a href="/logout">Sair</a>
+</header>
+
+<main>
+
+    <section class="card">
+        <h2>Mapa em tempo real</h2>
+        <p>Veja a última localização enviada pelos motoboys.</p>
+        <a href="/admin/mapa">
+            <button>Ver mapa dos motoboys</button>
+        </a>
+    </section>
+
+    <section class="card">
+        <h2>Operação</h2>
+        <a href="/admin/entregas">
+            <button>Ver entregas</button>
+        </a>
+
+        <a href="/admin/relatorio">
+            <button>Relatório financeiro</button>
+        </a>
+    </section>
+
+    <section class="card">
+        <h2>Cadastrar pedido teste</h2>
+
+        <form method="POST" action="/pedidos/novo" class="form-grid pedidos-form">
+            <input type="text" name="numero_pedido" placeholder="Número do pedido" required>
+            <input type="text" name="cliente_nome" placeholder="Nome do cliente" required>
+            <input type="email" name="cliente_email" placeholder="E-mail do cliente">
+            <input type="text" name="telefone" placeholder="Telefone">
+            <input type="text" name="endereco" placeholder="Endereço completo" required>
+            <input type="number" step="0.01" name="taxa_entrega" placeholder="Taxa de entrega">
+            <button type="submit">Criar pedido</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Pedidos</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Pedido</th>
+                    <th>Cliente</th>
+                    <th>Endereço</th>
+                    <th>Taxa</th>
+                    <th>Status</th>
+                    <th>QR Code</th>
+                    <th>Rastreio</th>
+                    <th>Mensagem</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for order in orders %}
+                <tr>
+                    <td>#{{ order.numero_pedido }}</td>
+                    <td>{{ order.cliente_nome }}</td>
+                    <td>{{ order.endereco }}</td>
+                    <td>R$ {{ "%.2f"|format(order.taxa_entrega) }}</td>
+                    <td>{{ order.status }}</td>
+
+                    <td>
+                        <button onclick="imprimirIframe('/print/qr/{{ order.id }}')">
+                            Imprimir QR
+                        </button>
+                    </td>
+
+                    <td>
+                        <a href="/rastreio/{{ order.tracking_token }}" target="_blank">
+                            Abrir
+                        </a>
+                    </td>
+
+                    <td>
+                        <button onclick="copiarMensagem('{{ order.numero_pedido }}', '{{ order.cliente_nome }}', '{{ order.tracking_token }}')">
+                            Copiar
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="card">
+        <h2>Cadastrar motoboy</h2>
+
+        <form method="POST" action="/motoboys/novo" class="form-grid">
+            <input type="text" name="nome" placeholder="Nome do motoboy" required>
+            <input type="text" name="telefone" placeholder="Telefone" required>
+            <input type="password" name="senha" placeholder="Senha" required>
+            <button type="submit">Cadastrar</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Motoboys cadastrados</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>Telefone</th>
+                    <th>Status</th>
+                    <th>Ação</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for driver in drivers %}
+                <tr>
+                    <td>{{ driver.id }}</td>
+                    <td>{{ driver.nome }}</td>
+                    <td>{{ driver.telefone }}</td>
+                    <td>{{ "Ativo" if driver.ativo else "Inativo" }}</td>
+                    <td>
+                        {% if driver.ativo %}
+                            <a class="danger" href="/motoboys/desativar/{{ driver.id }}">Desativar</a>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+</main>
+
+<iframe id="printFrame" style="display:none;"></iframe>
+
+<script>
+function copiarMensagem(numero, cliente, token) {
+    const link = window.location.origin + "/rastreio/" + token;
+
+    const mensagem =
+        "Olá, " + cliente +
+        "! Seu pedido #" + numero +
+        " saiu para entrega. Acompanhe o entregador em tempo real pelo link: " +
+        link;
+
+    const textarea = document.createElement("textarea");
+    textarea.value = mensagem;
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+
+    const copiado = document.execCommand("copy");
+
+    document.body.removeChild(textarea);
+
+    if (copiado) {
+        alert("Mensagem copiada!");
+    } else {
+        prompt("Copie a mensagem abaixo:", mensagem);
+    }
+}
+</script>
+
+</body>
+</html>

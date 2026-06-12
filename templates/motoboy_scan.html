@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Saída do Pedido</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <main class="mobile-page">
+        <section class="card">
+            <h1>Pedido #{{ order.numero_pedido }}</h1>
+
+            <p><strong>Cliente:</strong> {{ order.cliente_nome }}</p>
+            <p><strong>Endereço:</strong> {{ order.endereco }}</p>
+            <p><strong>Taxa:</strong> R$ {{ "%.2f"|format(order.taxa_entrega) }}</p>
+            <p><strong>Status:</strong> {{ order.status }}</p>
+
+            {% if erro %}
+                <div class="erro">{{ erro }}</div>
+            {% endif %}
+
+            {% if sucesso %}
+                <div class="sucesso">{{ sucesso }}</div>
+            {% endif %}
+
+            {% if not sucesso %}
+            <form method="POST">
+                <label>Selecione o motoboy:</label>
+                <select name="driver_id" required>
+                    <option value="">Escolher motoboy</option>
+                    {% for driver in drivers %}
+                        <option value="{{ driver.id }}">{{ driver.nome }}</option>
+                    {% endfor %}
+                </select>
+
+                <button type="submit">Dar saída no pedido</button>
+            </form>
+            {% endif %}
+        </section>
+    </main>
+</body>
+</html>

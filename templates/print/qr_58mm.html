@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>QR 58mm</title>
+
+<style>
+@media print {
+    @page {
+        size: 58mm auto;
+        margin: 0;
+    }
+}
+
+body {
+    width: 58mm;
+    margin: 0;
+    padding: 5mm 3mm;
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    color: #000;
+}
+
+.center {
+    text-align: center;
+}
+
+hr {
+    border: none;
+    border-top: 1px dashed #000;
+    margin: 8px 0;
+}
+
+.qr {
+    width: 38mm;
+    height: 38mm;
+}
+
+.small {
+    font-size: 10px;
+}
+
+.bold {
+    font-weight: bold;
+}
+</style>
+</head>
+
+<body>
+{% for via in [1,2] %}
+
+<div class="center">
+    <div class="bold">MOTOTRACK</div>
+    <div>Saída de Entrega</div>
+</div>
+
+<hr>
+
+<div>
+    <div><strong>Pedido:</strong> #{{ order.numero_pedido }}</div>
+    <div><strong>Cliente:</strong> {{ order.cliente_nome }}</div>
+    <div><strong>Endereço:</strong> {{ order.endereco }}</div>
+    <div><strong>Taxa:</strong> R$ {{ "%.2f"|format(order.taxa_entrega) }}</div>
+</div>
+
+<hr>
+
+<div class="center">
+    <img src="{{ qr_path }}" class="qr">
+    <div class="small">Escaneie para dar saída</div>
+</div>
+
+<hr>
+
+<div class="center small">
+    MotoTrack Delivery
+</div>
+{% if via == 1 %}
+<div style="page-break-after: always;"></div>
+{% endif %}
+
+{% endfor %}
+
+</body>
+</html>

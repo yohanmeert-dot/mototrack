@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório - MotoTrack</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+    <h1>Relatório Financeiro</h1>
+    <a href="/admin">Voltar</a>
+</header>
+
+<main>
+    <button onclick="window.print()">Imprimir relatório</button>
+
+    {% for item in relatorio %}
+    <section class="card">
+        <h2>{{ item.driver.nome }}</h2>
+<a href="/print/relatorio/{{ item.driver.id }}">
+    <button>Imprimir 58mm</button>
+</a>
+
+        <p><strong>Total de entregas:</strong> {{ item.total_entregas }}</p>
+        <p><strong>Total em taxas:</strong> R$ {{ "%.2f"|format(item.total_taxas) }}</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Pedido</th>
+                    <th>Cliente</th>
+                    <th>Saída</th>
+                    <th>Entrega</th>
+                    <th>Taxa</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entrega in item.entregas %}
+                <tr>
+                    <td>#{{ entrega.order.numero_pedido }}</td>
+                    <td>{{ entrega.order.cliente_nome }}</td>
+                    <td>{{ entrega.horario_saida.strftime("%H:%M:%S") }}</td>
+                    <td>
+                        {% if entrega.horario_entrega %}
+                            {{ entrega.horario_entrega.strftime("%H:%M:%S") }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td>R$ {{ "%.2f"|format(entrega.order.taxa_entrega) }}</td>
+                    <td>{{ entrega.status }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endfor %}
+</main>
+</body>
+</html>

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Rastreio do Pedido</title>
+    <link rel="stylesheet" href="/static/style.css">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+</head>
+<body>
+    <main class="tracking-page">
+        <section class="tracking-card">
+            <h1>Seu pedido está a caminho</h1>
+
+            <p><strong>Pedido:</strong> #{{ order.numero_pedido }}</p>
+            <p><strong>Status:</strong> <span id="status">{{ order.status }}</span></p>
+
+            {% if entrega %}
+                <p><strong>Entregador:</strong> {{ entrega.driver.nome }}</p>
+            {% else %}
+                <p><strong>Entregador:</strong> aguardando saída</p>
+            {% endif %}
+
+            <p><strong>Previsão:</strong> <span id="eta">Calculando...</span></p>
+
+            <div id="clienteMap"></div>
+
+            <p class="small">
+                Última atualização: <span id="ultima">---</span>
+            </p>
+        </section>
+    </main>
+
+<script>
+    const token = "{{ order.tracking_token }}";
+
+    const map = L.map("clienteMap").setView([-25.095, -50.161], 13);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19
+    }).addTo(map);
+
+    let marker = null;
+
+    async function atualizarRastreio() {
+        const resposta = await fetch(`/api/rastreio/${token}`);
+        const dados = await resposta.json();
+
+        document.getElementById("status").innerText = dados.status || "---";
+        document.getElementById("eta").innerText = dados.eta_texto || "Aguardando saída";
+        document.getElementById("ultima").innerText = dados.ultima_atualizacao || "---";
+
+        if (dados.latitude && dados.longitude) {
+            const posicao = [dados.latitude, dados.longitude];
+
+            if (marker) {
+                marker.setLatLng(posicao);
+            } else {
+                marker = L.marker(posicao).addTo(map).bindPopup("Entregador");
+            }
+
+            map.setView(posicao, 15);
+        }
+    }
+
+    atualizarRastreio();
+    setInterval(atualizarRastreio, 5000);
+</script>
+
+</body>
+</html>

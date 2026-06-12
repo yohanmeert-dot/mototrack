@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Entregas - MotoTrack</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+    <h1>Entregas</h1>
+    <a href="/admin">Voltar</a>
+</header>
+
+<main>
+    <section class="card">
+        <h2>Histórico de entregas</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Pedido</th>
+                    <th>Motoboy</th>
+                    <th>Saída</th>
+                    <th>Entrega</th>
+                    <th>Taxa</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entrega in entregas %}
+                <tr>
+                    <td>#{{ entrega.order.numero_pedido }}</td>
+                    <td>{{ entrega.driver.nome }}</td>
+                    <td>{{ entrega.horario_saida.strftime("%H:%M:%S") }}</td>
+                    <td>
+                        {% if entrega.horario_entrega %}
+                            {{ entrega.horario_entrega.strftime("%H:%M:%S") }}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td>R$ {{ "%.2f"|format(entrega.order.taxa_entrega) }}</td>
+                    <td>{{ entrega.status }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</main>
+</body>
+</html>
