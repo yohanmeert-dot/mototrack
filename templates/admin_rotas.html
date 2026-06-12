@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Rotas - MotoTrack</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header>
+    <h1>Rotas dos Motoboys</h1>
+    <a href="/admin">Voltar</a>
+</header>
+
+<main>
+    {% for rota in rotas %}
+    <section class="card">
+        <h2>{{ rota.driver.nome }}</h2>
+
+        {% if rota.itens %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Ordem</th>
+                        <th>Pedido</th>
+                        <th>Cliente</th>
+                        <th>Endereço</th>
+                        <th>Taxa</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in rota.itens %}
+                    <tr>
+                        <td>{{ item.route_order }}</td>
+                        <td>#{{ item.order.numero_pedido }}</td>
+                        <td>{{ item.order.cliente_nome }}</td>
+                        <td>{{ item.order.endereco }}</td>
+                        <td>R$ {{ "%.2f"|format(item.order.taxa_entrega) }}</td>
+                        <td>{{ item.status }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>Nenhum pedido em rota para este motoboy.</p>
+        {% endif %}
+    </section>
+    {% endfor %}
+</main>
+
+</body>
+</html>

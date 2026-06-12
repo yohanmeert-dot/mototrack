@@ -49,6 +49,18 @@ class Delivery(db.Model):
     order = db.relationship("Order", backref="deliveries")
     driver = db.relationship("Driver", backref="deliveries")
 
+class DeliveryRouteItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    delivery_id = db.Column(db.Integer, db.ForeignKey("delivery.id"), nullable=False)
+    driver_id = db.Column(db.Integer, db.ForeignKey("driver.id"), nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey("order.id"), nullable=False)
+    route_order = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.String(30), default="PENDENTE")
+    criado_em = db.Column(db.DateTime, default=datetime.now)
+
+    delivery = db.relationship("Delivery", backref="route_items")
+    driver = db.relationship("Driver", backref="route_items")
+    order = db.relationship("Order", backref="route_items")
 
 class DriverLocation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -205,7 +217,30 @@ def scan_pedido(token):
 
         order.status = "EM_ROTA"
 
+
+
         db.session.add(entrega)
+        db.session.flush()
+
+        ultima_rota = DeliveryRouteItem.query.filter_by(
+            driver_id=driver.id,
+            status="PENDENTE"
+        ).order_by(DeliveryRouteItem.route_order.desc()).first()
+
+        proxima_ordem = 1
+
+        if ultima_rota:
+            proxima_ordem = ultima_rota.route_order + 1
+
+        rota_item = DeliveryRouteItem(
+            delivery_id=entrega.id,
+            driver_id=driver.id,
+            order_id=order.id,
+            route_order=proxima_ordem,
+            status="PENDENTE"
+        )
+
+        db.session.add(rota_item)
         db.session.commit()
 
         return render_template(
@@ -290,6 +325,27 @@ def api_driver_scan():
     order.status = "EM_ROTA"
 
     db.session.add(entrega)
+    db.session.flush()
+
+    ultima_rota = DeliveryRouteItem.query.filter_by(
+        driver_id=driver.id,
+        status="PENDENTE"
+    ).order_by(DeliveryRouteItem.route_order.desc()).first()
+
+    proxima_ordem = 1
+
+    if ultima_rota:
+        proxima_ordem = ultima_rota.route_order + 1
+
+    rota_item = DeliveryRouteItem(
+        delivery_id=entrega.id,
+        driver_id=driver.id,
+        order_id=order.id,
+        route_order=proxima_ordem,
+        status="PENDENTE"
+    )
+
+    db.session.add(rota_item)
     db.session.commit()
 
     return jsonify({
@@ -539,6 +595,28 @@ def api_rastreio_cliente(token):
 def motoboy_app_teste(driver_id):
     driver = Driver.query.get_or_404(driver_id)
     return render_template("motoboy_app.html", driver=driver)
+
+@app.route("/admin/rotas")
+def admin_rotas():
+    if not session.get("admin"):
+        return redirect("/login")
+
+    drivers = Driver.query.filter_by(ativo=True).all()
+
+    rotas = []
+
+    for driver in drivers:
+        itens = DeliveryRouteItem.query.filter_by(
+            driver_id=driver.id,
+            status="PENDENTE"
+        ).order_by(DeliveryRouteItem.route_order.asc()).all()
+
+        rotas.append({
+            "driver": driver,
+            "itens": itens
+        })
+
+    return render_template("admin_rotas.html", rotas=rotas)
 
 @app.route("/logout")
 def logout():
