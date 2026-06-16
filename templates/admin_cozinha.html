@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Cozinha - MotoTrack</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+<header>
+    <h1>Cozinha / Pedidos Yampi</h1>
+    <a href="/admin">Voltar</a>
+</header>
+
+<main>
+    <section class="card">
+        <h2>Sincronização</h2>
+
+        <button onclick="syncYampiOrders(event)">
+            Sincronizar pedidos
+        </button>
+
+        <p>O painel também verifica pedidos novos automaticamente.</p>
+    </section>
+
+    <section class="card">
+        <h2>Pedidos da cozinha</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Pedido</th>
+                    <th>Cliente</th>
+                    <th>Telefone</th>
+                    <th>Total</th>
+                    <th>Pagamento</th>
+                    <th>Status</th>
+                    <th>Editar</th>
+                    <th>Imprimir</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for order in orders %}
+                <tr>
+                    <td>#{{ order.yampi_id }}</td>
+                    <td>{{ order.customer_name }}</td>
+                    <td>{{ order.customer_phone }}</td>
+                    <td>R$ {{ "%.2f"|format(order.total) }}</td>
+                    <td>
+                        {{ order.payment_method or "-" }}
+                        <br>
+                        <small>{{ order.payment_status or "" }}</small>
+                    </td>
+                    <td>{{ order.order_status }}</td>
+
+                    <td>
+                        <select id="payment-{{ order.id }}">
+                            <option value="">Pagamento local</option>
+                            <option value="PIX" {% if order.local_payment_method == "PIX" %}selected{% endif %}>PIX</option>
+                            <option value="DINHEIRO" {% if order.local_payment_method == "DINHEIRO" %}selected{% endif %}>DINHEIRO</option>
+                            <option value="CARTAO" {% if order.local_payment_method == "CARTAO" %}selected{% endif %}>CARTÃO</option>
+                            <option value="VR" {% if order.local_payment_method == "VR" %}selected{% endif %}>VR</option>
+                            <option value="IFOOD" {% if order.local_payment_method == "IFOOD" %}selected{% endif %}>IFOOD</option>
+                        </select>
+
+                        <textarea id="notes-{{ order.id }}" placeholder="Observações">{{ order.notes or "" }}</textarea>
+
+                        <button onclick="saveKitchenOrderInfo({{ order.id }})">
+                            Salvar
+                        </button>
+                    </td>
+
+                    <td>
+                        <button onclick="printKitchenOrder({{ order.id }})">
+                            Imprimir 58mm
+                        </button>
+
+                        <br><br>
+
+                        <button onclick="markKitchenPreparing({{ order.id }})">
+                            Em preparo
+                        </button>
+
+                        <button onclick="markKitchenFinished({{ order.id }})">
+                            Finalizado
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</main>
+
+<script src="/static/cozinha.js"></script>
+
+</body>
+</html>

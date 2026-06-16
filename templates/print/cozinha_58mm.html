@@ -1,0 +1,118 @@
+ <!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Pedido Cozinha 58mm</title>
+
+<style>
+@media print {
+    @page {
+        size: 58mm auto;
+        margin: 0;
+    }
+}
+
+body {
+    width: 58mm;
+    margin: 0;
+    padding: 5mm 3mm;
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+    color: #000;
+}
+
+.center {
+    text-align: center;
+}
+
+.big {
+    font-size: 15px;
+    font-weight: bold;
+}
+
+.small {
+    font-size: 10px;
+}
+
+hr {
+    border: none;
+    border-top: 1px dashed #000;
+    margin: 8px 0;
+}
+
+.item {
+    margin-bottom: 8px;
+}
+
+textarea {
+    width: 100%;
+}
+</style>
+</head>
+
+<body>
+
+<div class="center">
+    <div class="big">CANTINHO DO ALEMÃO</div>
+    <div>Pedido Cozinha</div>
+</div>
+
+<hr>
+
+<div>
+    <strong>Pedido:</strong> #{{ order.yampi_id }}<br>
+    <strong>Cliente:</strong> {{ order.customer_name }}<br>
+    <strong>Telefone:</strong> {{ order.customer_phone }}<br>
+    <strong>CPF:</strong> {{ order.customer_document or "-" }}<br>
+</div>
+
+<hr>
+
+<div>
+    <strong>Endereço:</strong><br>
+    {{ order.customer_address }}
+</div>
+
+<hr>
+
+<div>
+    <strong>ITENS:</strong>
+</div>
+
+{% for item in order.items_json or [] %}
+<div class="item">
+    <strong>{{ item.quantity }}x {{ item.name }}</strong><br>
+
+    {% if item.customizations %}
+        {% for c in item.customizations %}
+            - {{ c }}<br>
+        {% endfor %}
+    {% endif %}
+</div>
+{% endfor %}
+
+<hr>
+
+<div>
+    <strong>Pagamento:</strong> {{ order.local_payment_method or order.payment_method or "-" }}<br>
+    <strong>Status pagamento:</strong> {{ order.payment_status or "-" }}<br>
+    <strong>Taxa entrega:</strong> R$ {{ "%.2f"|format(order.delivery_fee) }}<br>
+    <strong>Total:</strong> R$ {{ "%.2f"|format(order.total) }}<br>
+</div>
+
+{% if order.notes %}
+<hr>
+<div>
+    <strong>Observações:</strong><br>
+    {{ order.notes }}
+</div>
+{% endif %}
+
+<hr>
+
+<div class="center small">
+    MotoTrack Delivery
+</div>
+
+</body>
+</html>

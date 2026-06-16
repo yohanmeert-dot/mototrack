@@ -5,6 +5,8 @@ from datetime import datetime
 import secrets
 import os
 import qrcode
+import requests
+
 
 app = Flask(__name__)
 app.secret_key = "mototrack_secret_key"
@@ -70,6 +72,37 @@ class DriverLocation(db.Model):
     criado_em = db.Column(db.DateTime, default=datetime.now)
 
     driver = db.relationship("Driver", backref="locations")
+
+class YampiOrder(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    yampi_id = db.Column(db.String(100), unique=True, nullable=False)
+
+    mototrack_order_id = db.Column(db.Integer, db.ForeignKey("order.id"))
+
+    customer_name = db.Column(db.String(255))
+    customer_phone = db.Column(db.String(100))
+    customer_email = db.Column(db.String(255))
+    customer_document = db.Column(db.String(100))
+    customer_address = db.Column(db.Text)
+
+    items_json = db.Column(db.JSON)
+
+    total = db.Column(db.Float, default=0)
+    delivery_fee = db.Column(db.Float, default=0)
+
+    payment_status = db.Column(db.String(100))
+    payment_method = db.Column(db.String(100))
+    local_payment_method = db.Column(db.String(100))
+
+    order_status = db.Column(db.String(100), default="novo")
+    notes = db.Column(db.Text)
+
+    raw_json = db.Column(db.JSON)
+
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now)
+
+    mototrack_order = db.relationship("Order", backref="yampi_order")
 
 
 @app.route("/")
