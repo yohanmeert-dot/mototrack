@@ -308,6 +308,125 @@ def login():
 
     return render_template("login.html")
 
+# =========================
+# APIs DE ROTA DO APP
+# =========================
+
+def get_order_items_for_app(order_id):
+    yampi_order = YampiOrder.query.filter_by(mototrack_order_id=order_id).first()
+
+    if not yampi_order:
+        return []
+
+    return yampi_order.items_json or []
+
+
+def get_yampi_info_for_app(order_id):
+    yampi_order = YampiOrder.query.filter_by(mototrack_order_id=order_id).first()
+
+    if not yampi_order:
+        return None
+
+    return {
+        "yampi_id": yampi_order.yampi_id,
+        "customer_document": yampi_order.customer_document,
+        "payment_method": yampi_order.local_payment_method or yampi_order.payment_method,
+        "payment_status": yampi_order.payment_status,
+        "total": yampi_order.total,
+        "delivery_fee": yampi_order.delivery_fee,
+        "notes": yampi_order.notes,
+        "items": yampi_order.items_json or []
+    }
+
+
+@app.route("/api/driver/route/<int:driver_id>", methods=["GET"])
+def api_driver_route(driver_id):
+    driver = Driver.query.filter_by(id=driver_id, ativo=True).first()
+
+    if not driver:
+        return jsonify({
+            "success": False,
+            "message": "Motoboy não encontrado ou inativo."
+        }), 404
+
+    route_items = DeliveryRouteItem.query.filter_by(
+        driver_id=driver.id,
+        status="PENDENTE"
+    ).order_by(DeliveryRouteItem.route_order.asc()).all()
+
+    route = []
+
+    for item in route_items:
+        order = item.order
+        yampi_info = get_yampi_info_for_app(order.id)
+
+        route.append({
+            "route_item_id": item.id,
+            "delivery_id": item.delivery_id,
+            "order_id": order.id,
+            "numero_pedido": order.numero_pedido,
+            "route_order": item.route_order,
+            "cliente_nome": order.cliente_nome,
+            "cliente_email": order.cliente_email,
+            "telefone": order.telefone,
+            "endereco": order.endereco,
+            "taxa_entrega": order.taxa_entrega,
+            "status": order.status,
+            "tracking_token": order.tracking_token,
+            "items": yampi_info["items"] if yampi_info else [],
+            "payment_method": yampi_info["payment_method"] if yampi_info else None,
+            "payment_status": yampi_info["payment_status"] if yampi_info else None,
+            "total": yampi_info["total"] if yampi_info else None,
+            "notes": yampi_info["notes"] if yampi_info else None
+        })
+
+    ultima = DriverLocation.query.filter_by(
+        driver_id=driver.id
+    ).order_by(DriverLocation.id.desc()).first()
+
+    return jsonify({
+        "success": True,
+        "driver": {
+            "id": driver.id,
+            "nome": driver.nome,
+            "telefone": driver.telefone
+        },
+        "current_location": {
+            "latitude": ultima.latitude if ultima else None,
+            "longitude": ultima.longitude if ultima else None,
+            "updated_at": ultima.criado_em.strftime("%H:%M:%S") if ultima else None
+        },
+        "route": route
+    })
+
+
+@app.route("/api/driver/order/<int:order_id>", methods=["GET"])
+def api_driver_order_detail(order_id):
+    order = Order.query.get_or_404(order_id)
+    yampi_info = get_yampi_info_for_app(order.id)
+
+    entrega = Delivery.query.filter_by(order_id=order.id).order_by(Delivery.id.desc()).first()
+
+    return jsonify({
+        "success": True,
+        "order": {
+            "id": order.id,
+            "numero_pedido": order.numero_pedido,
+            "cliente_nome": order.cliente_nome,
+            "cliente_email": order.cliente_email,
+            "telefone": order.telefone,
+            "endereco": order.endereco,
+            "taxa_entrega": order.taxa_entrega,
+            "status": order.status,
+            "tracking_token": order.tracking_token,
+            "driver_name": entrega.driver.nome if entrega else None,
+            "items": yampi_info["items"] if yampi_info else [],
+            "payment_method": yampi_info["payment_method"] if yampi_info else None,
+            "payment_status": yampi_info["payment_status"] if yampi_info else None,
+            "total": yampi_info["total"] if yampi_info else None,
+            "notes": yampi_info["notes"] if yampi_info else None
+        }
+    })
 
 @app.route("/logout")
 def logout():
@@ -533,7 +652,7 @@ def api_driver_scan():
     db.session.add(entrega)
     db.session.flush()
 
-    criar_item_rota(driver, order, entrega)
+    rota_item = criar_item_rota(driver, order, entrega)
 
     db.session.commit()
 
@@ -545,12 +664,17 @@ def api_driver_scan():
             "id": order.id,
             "numero_pedido": order.numero_pedido,
             "cliente_nome": order.cliente_nome,
+            "cliente_email": order.cliente_email,
+            "telefone": order.telefone,
             "endereco": order.endereco,
             "taxa_entrega": order.taxa_entrega,
-            "status": order.status
+            "status": order.status,
+            "tracking_token": order.tracking_token,
+            "route_order": rota_item.route_order if rota_item else None,
+            "items": get_order_items_for_app(order.id),
+            "yampi_info": get_yampi_info_for_app(order.id)
         }
     })
-
 
 @app.route("/api/driver/location", methods=["POST"])
 def api_driver_location():
