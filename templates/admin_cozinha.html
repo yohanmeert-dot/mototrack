@@ -7,38 +7,46 @@
 </head>
 
 <body>
-<header>
-    <h1>Cozinha / Pedidos Yampi</h1>
-    <a href="/admin">Voltar</a>
+<header class="topbar">
+    <div>
+        <h1>Cozinha / Yampi</h1>
+        <p>Painel vivo de produção</p>
+    </div>
+    <a class="logout" href="/admin">Voltar</a>
 </header>
 
-<main>
-    <section class="card">
-        <h2>Painel vivo</h2>
+<main class="dashboard">
 
-        <button onclick="syncYampiOrders(event)">
-            Sincronizar agora
-        </button>
+    <section class="hero kitchen-hero">
+        <div>
+            <h2>Pedidos em tempo real</h2>
+            <p>Sincronização automática, impressão 58mm e controle de preparo.</p>
+        </div>
 
-        <button onclick="toggleSound()" id="soundButton">
-            Som: ativado
-        </button>
-
-        <p>
-            Última atualização:
-            <strong id="lastUpdate">---</strong>
-        </p>
-
-        <p id="syncStatus">Aguardando sincronização...</p>
-    </section>
-
-    <section class="card">
-        <h2>Pedidos da cozinha</h2>
-
-        <div id="ordersContainer">
-            <p>Carregando pedidos...</p>
+        <div class="hero-actions">
+            <button onclick="syncYampiOrders(event)">Sincronizar agora</button>
+            <button onclick="toggleSound()" id="soundButton">🔔 Som ativado</button>
         </div>
     </section>
+
+    <section class="status-row">
+        <div class="status-card">
+            <span>Última atualização</span>
+            <strong id="lastUpdate">---</strong>
+        </div>
+
+        <div class="status-card">
+            <span>Status</span>
+            <strong id="syncStatus">Aguardando sincronização...</strong>
+        </div>
+    </section>
+
+    <section>
+        <div id="ordersContainer">
+            <div class="empty-state">Carregando pedidos...</div>
+        </div>
+    </section>
+
 </main>
 
 <script src="/static/cozinha.js"></script>

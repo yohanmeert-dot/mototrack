@@ -7,41 +7,51 @@
 </head>
 
 <body>
-<header>
-    <h1>MotoTrack</h1>
-    <a href="/logout">Sair</a>
+<header class="topbar">
+    <div>
+        <h1>MotoTrack</h1>
+        <p>Painel administrativo</p>
+    </div>
+    <a class="logout" href="/logout">Sair</a>
 </header>
 
-<main>
+<main class="dashboard">
 
-    <section class="card">
-        <h2>Mapa em tempo real</h2>
-        <p>Veja a última localização enviada pelos motoboys.</p>
-        <a href="/admin/mapa">
-            <button>Ver mapa dos motoboys</button>
+    <section class="hero">
+        <div>
+            <h2>Controle de entregas em tempo real</h2>
+            <p>Pedidos, motoboys, rastreio, cozinha e relatórios em um só lugar.</p>
+        </div>
+    </section>
+
+    <section class="menu-grid">
+        <a href="/admin/cozinha" class="menu-card orange">
+            <h3>Cozinha / Yampi</h3>
+            <p>Pedidos, impressão 58mm e produção.</p>
+        </a>
+
+        <a href="/admin/mapa" class="menu-card blue">
+            <h3>Mapa ao vivo</h3>
+            <p>Localização dos motoboys.</p>
+        </a>
+
+        <a href="/admin/rotas" class="menu-card purple">
+            <h3>Rotas</h3>
+            <p>Fila de entregas por motoboy.</p>
+        </a>
+
+        <a href="/admin/entregas" class="menu-card green">
+            <h3>Entregas</h3>
+            <p>Histórico operacional.</p>
+        </a>
+
+        <a href="/admin/relatorio" class="menu-card dark">
+            <h3>Relatório financeiro</h3>
+            <p>Taxas por motoboy.</p>
         </a>
     </section>
 
-    <section class="card">
-        <h2>Operação</h2>
-        <a href="/admin/entregas">
-            <button>Ver entregas</button>
-        </a>
-
-        <a href="/admin/relatorio">
-            <button>Relatório financeiro</button>
-        </a>
-
-        <a href="/admin/rotas">
-            <button>Rotas dos motoboys</button>
-        </a>
-
-	<a href="/admin/cozinha">
-            <button>Cozinha / Pedidos Yampi</button>
-	</a>
-    </section>
-
-    <section class="card">
+    <section class="panel">
         <h2>Cadastrar pedido teste</h2>
 
         <form method="POST" action="/pedidos/novo" class="form-grid pedidos-form">
@@ -55,56 +65,58 @@
         </form>
     </section>
 
-    <section class="card">
+    <section class="panel">
         <h2>Pedidos</h2>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>Pedido</th>
-                    <th>Cliente</th>
-                    <th>Endereço</th>
-                    <th>Taxa</th>
-                    <th>Status</th>
-                    <th>QR Code</th>
-                    <th>Rastreio</th>
-                    <th>Mensagem</th>
-                </tr>
-            </thead>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Pedido</th>
+                        <th>Cliente</th>
+                        <th>Endereço</th>
+                        <th>Taxa</th>
+                        <th>Status</th>
+                        <th>QR</th>
+                        <th>Rastreio</th>
+                        <th>Mensagem</th>
+                    </tr>
+                </thead>
 
-            <tbody>
-                {% for order in orders %}
-                <tr>
-                    <td>#{{ order.numero_pedido }}</td>
-                    <td>{{ order.cliente_nome }}</td>
-                    <td>{{ order.endereco }}</td>
-                    <td>R$ {{ "%.2f"|format(order.taxa_entrega) }}</td>
-                    <td>{{ order.status }}</td>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td><strong>#{{ order.numero_pedido }}</strong></td>
+                        <td>{{ order.cliente_nome }}</td>
+                        <td>{{ order.endereco }}</td>
+                        <td>R$ {{ "%.2f"|format(order.taxa_entrega) }}</td>
+                        <td><span class="badge">{{ order.status }}</span></td>
 
-                    <td>
-                        <button onclick="imprimirIframe('/print/qr/{{ order.id }}')">
-                            Imprimir QR
-                        </button>
-                    </td>
+                        <td>
+                            <button class="small-btn" onclick="imprimirIframe('/print/qr/{{ order.id }}')">
+                                Imprimir
+                            </button>
+                        </td>
 
-                    <td>
-                        <a href="/rastreio/{{ order.tracking_token }}" target="_blank">
-                            Abrir
-                        </a>
-                    </td>
+                        <td>
+                            <a class="small-link" href="/rastreio/{{ order.tracking_token }}" target="_blank">
+                                Abrir
+                            </a>
+                        </td>
 
-                    <td>
-                        <button onclick="copiarMensagem('{{ order.numero_pedido }}', '{{ order.cliente_nome }}', '{{ order.tracking_token }}')">
-                            Copiar
-                        </button>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                        <td>
+                            <button class="small-btn light" onclick="copiarMensagem('{{ order.numero_pedido }}', '{{ order.cliente_nome }}', '{{ order.tracking_token }}')">
+                                Copiar
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </section>
 
-    <section class="card">
+    <section class="panel">
         <h2>Cadastrar motoboy</h2>
 
         <form method="POST" action="/motoboys/novo" class="form-grid">
@@ -115,38 +127,40 @@
         </form>
     </section>
 
-    <section class="card">
+    <section class="panel">
         <h2>Motoboys cadastrados</h2>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Nome</th>
-                    <th>Telefone</th>
-                    <th>Status</th>
-                    <th>Ação</th>
-                </tr>
-            </thead>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nome</th>
+                        <th>Telefone</th>
+                        <th>Status</th>
+                        <th>Ação</th>
+                    </tr>
+                </thead>
 
-            <tbody>
-                {% for driver in drivers %}
-                <tr>
-                    <td>{{ driver.id }}</td>
-                    <td>{{ driver.nome }}</td>
-                    <td>{{ driver.telefone }}</td>
-                    <td>{{ "Ativo" if driver.ativo else "Inativo" }}</td>
-                    <td>
-                        {% if driver.ativo %}
-                            <a class="danger" href="/motoboys/desativar/{{ driver.id }}">Desativar</a>
-                        {% else %}
-                            —
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                <tbody>
+                    {% for driver in drivers %}
+                    <tr>
+                        <td>{{ driver.id }}</td>
+                        <td><strong>{{ driver.nome }}</strong></td>
+                        <td>{{ driver.telefone }}</td>
+                        <td>{{ "Ativo" if driver.ativo else "Inativo" }}</td>
+                        <td>
+                            {% if driver.ativo %}
+                                <a class="danger" href="/motoboys/desativar/{{ driver.id }}">Desativar</a>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </section>
 
 </main>
@@ -156,7 +170,6 @@
 <script>
 function imprimirIframe(url) {
     const frame = document.getElementById("printFrame");
-
     frame.src = url;
 
     frame.onload = function () {
