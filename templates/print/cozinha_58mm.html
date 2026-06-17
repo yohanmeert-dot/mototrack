@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -15,37 +15,30 @@
 body {
     width: 58mm;
     margin: 0;
-    padding: 5mm 3mm;
+    padding: 4mm 3mm;
     font-family: Arial, sans-serif;
     font-size: 12px;
     color: #000;
 }
 
-.center {
-    text-align: center;
-}
-
-.big {
-    font-size: 15px;
-    font-weight: bold;
-}
-
-.small {
-    font-size: 10px;
-}
+.center { text-align: center; }
+.big { font-size: 15px; font-weight: bold; }
+.bold { font-weight: bold; }
+.small { font-size: 10px; }
 
 hr {
     border: none;
     border-top: 1px dashed #000;
-    margin: 8px 0;
+    margin: 7px 0;
 }
 
 .item {
     margin-bottom: 8px;
 }
 
-textarea {
-    width: 100%;
+.qr {
+    width: 34mm;
+    height: 34mm;
 }
 </style>
 </head>
@@ -54,7 +47,8 @@ textarea {
 
 <div class="center">
     <div class="big">CANTINHO DO ALEMÃO</div>
-    <div>Pedido Cozinha</div>
+    <div class="bold">PEDIDO COZINHA</div>
+    <div class="small">MotoTrack Delivery</div>
 </div>
 
 <hr>
@@ -62,7 +56,7 @@ textarea {
 <div>
     <strong>Pedido:</strong> #{{ order.yampi_id }}<br>
     <strong>Cliente:</strong> {{ order.customer_name }}<br>
-    <strong>Telefone:</strong> {{ order.customer_phone }}<br>
+    <strong>Telefone:</strong> {{ order.customer_phone or "-" }}<br>
     <strong>CPF:</strong> {{ order.customer_document or "-" }}<br>
 </div>
 
@@ -70,14 +64,12 @@ textarea {
 
 <div>
     <strong>Endereço:</strong><br>
-    {{ order.customer_address }}
+    {{ order.customer_address or "-" }}
 </div>
 
 <hr>
 
-<div>
-    <strong>ITENS:</strong>
-</div>
+<div class="bold center">ITENS DO PEDIDO</div>
 
 {% for item in order.items_json or [] %}
 <div class="item">
@@ -95,9 +87,9 @@ textarea {
 
 <div>
     <strong>Pagamento:</strong> {{ order.local_payment_method or order.payment_method or "-" }}<br>
-    <strong>Status pagamento:</strong> {{ order.payment_status or "-" }}<br>
-    <strong>Taxa entrega:</strong> R$ {{ "%.2f"|format(order.delivery_fee) }}<br>
-    <strong>Total:</strong> R$ {{ "%.2f"|format(order.total) }}<br>
+    <strong>Status pgto:</strong> {{ order.payment_status or "-" }}<br>
+    <strong>Taxa entrega:</strong> R$ {{ "%.2f"|format(order.delivery_fee or 0) }}<br>
+    <strong>Total:</strong> R$ {{ "%.2f"|format(order.total or 0) }}<br>
 </div>
 
 {% if order.notes %}
@@ -108,10 +100,19 @@ textarea {
 </div>
 {% endif %}
 
+{% if order.mototrack_order %}
+<hr>
+<div class="center">
+    <div class="bold">QR DO MOTOBOY</div>
+    <img class="qr" src="/qr_codes/pedido_{{ order.mototrack_order.id }}.png">
+    <div class="small">Escanear para dar saída</div>
+</div>
+{% endif %}
+
 <hr>
 
 <div class="center small">
-    MotoTrack Delivery
+    Impresso pelo MotoTrack
 </div>
 
 </body>
