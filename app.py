@@ -9,13 +9,17 @@ import requests
 
 
 app = Flask(__name__)
-app.secret_key = "mototrack_secret_key"
+app.secret_key = os.environ.get("SECRET_KEY", "mototrack_secret_key")
 
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///database.db"
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///database.db")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
 
+
+# =========================
+# MODELOS DO BANCO
+# =========================
 
 class Driver(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -51,6 +55,7 @@ class Delivery(db.Model):
     order = db.relationship("Order", backref="deliveries")
     driver = db.relationship("Driver", backref="deliveries")
 
+
 class DeliveryRouteItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     delivery_id = db.Column(db.Integer, db.ForeignKey("delivery.id"), nullable=False)
@@ -64,6 +69,7 @@ class DeliveryRouteItem(db.Model):
     driver = db.relationship("Driver", backref="route_items")
     order = db.relationship("Order", backref="route_items")
 
+
 class DriverLocation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     driver_id = db.Column(db.Integer, db.ForeignKey("driver.id"), nullable=False)
@@ -72,6 +78,7 @@ class DriverLocation(db.Model):
     criado_em = db.Column(db.DateTime, default=datetime.now)
 
     driver = db.relationship("Driver", backref="locations")
+
 
 class YampiOrder(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -105,9 +112,186 @@ class YampiOrder(db.Model):
     mototrack_order = db.relationship("Order", backref="yampi_order")
 
 
+# =========================
+# FUNÇÕES AUXILIARES
+# =========================
+
+def gerar_qrcode(order):
+    pasta = "qr_codes"
+    os.makedirs(pasta, exist_ok=True)
+
+    base_url = os.environ.get("BASE_URL", "http://127.0.0.1:6061").rstrip("/")
+    link = f"{base_url}/motoboy/scan/{order.qr_token}"
+
+    img = qrcode.make(link)
+    caminho = os.path.join(pasta, f"pedido_{order.id}.png")
+    img.save(caminho)
+
+
+def criar_item_rota(driver, order, entrega):
+    ultima_rota = DeliveryRouteItem.query.filter_by(
+        driver_id=driver.id,
+        status="PENDENTE"
+    ).order_by(DeliveryRouteItem.route_order.desc()).first()
+
+    proxima_ordem = 1
+
+    if ultima_rota:
+        proxima_ordem = ultima_rota.route_order + 1
+
+    rota_item = DeliveryRouteItem(
+        delivery_id=entrega.id,
+        driver_id=driver.id,
+        order_id=order.id,
+        route_order=proxima_ordem,
+        status="PENDENTE"
+    )
+
+    db.session.add(rota_item)
+
+
+def yampi_headers():
+    return {
+        "User-Token": os.environ.get("YAMPI_USER_TOKEN", ""),
+        "User-Secret-Key": os.environ.get("YAMPI_SECRET_KEY", ""),
+        "Content-Type": "application/json",
+    }
+
+
+def get_yampi_base_url():
+    alias = os.environ.get("YAMPI_ALIAS", "").strip()
+    return f"https://api.dooki.com.br/v2/{alias}"
+
+
+def extract_text(value):
+    if value is None:
+        return ""
+
+    if isinstance(value, str):
+        return value
+
+    if isinstance(value, (int, float)):
+        return str(value)
+
+    if isinstance(value, dict):
+        return (
+            value.get("formated_number")
+            or value.get("formatted_number")
+            or value.get("full_number")
+            or value.get("number")
+            or value.get("alias")
+            or value.get("name")
+            or value.get("status")
+            or ""
+        )
+
+    return str(value)
+
+
+def get_nested_data(value):
+    if isinstance(value, dict):
+        if isinstance(value.get("data"), dict):
+            return value.get("data") or {}
+        return value
+    return {}
+
+
+def get_float(value, default=0):
+    try:
+        if value is None or value == "":
+            return default
+        return float(value)
+    except Exception:
+        return default
+
+
+def get_order_items_from_yampi(yampi_id):
+    items = []
+
+    try:
+        items_url = f"{get_yampi_base_url()}/orders/{yampi_id}/items"
+        items_response = requests.get(
+            items_url,
+            headers=yampi_headers(),
+            timeout=20
+        )
+
+        if not items_response.ok:
+            return items
+
+        items_json = items_response.json()
+        products_data = items_json.get("data", [])
+
+        for product in products_data:
+            quantity = product.get("quantity", 1)
+
+            sku_data = get_nested_data(product.get("sku"))
+
+            product_name = (
+                sku_data.get("title")
+                or sku_data.get("name")
+                or product.get("name")
+                or product.get("title")
+                or "Produto"
+            )
+
+            price = get_float(product.get("price") or sku_data.get("price_sale") or 0)
+
+            customizations = []
+            customizations_data = product.get("customizations", [])
+
+            if isinstance(customizations_data, dict):
+                customizations_data = customizations_data.get("data", []) or []
+
+            if not isinstance(customizations_data, list):
+                customizations_data = []
+
+            for customization in customizations_data:
+                value = (
+                    customization.get("value")
+                    or customization.get("name")
+                    or customization.get("title")
+                    or customization.get("description")
+                )
+
+                if value:
+                    customizations.append(str(value))
+
+            items.append({
+                "name": product_name,
+                "quantity": quantity,
+                "price": price,
+                "customizations": customizations
+            })
+
+    except Exception as e:
+        print("ERRO AO BUSCAR ITENS:", e)
+
+    return items
+
+
+# =========================
+# ROTAS PRINCIPAIS
+# =========================
+
 @app.route("/")
 def home():
     return redirect("/login")
+
+
+@app.route("/__routes")
+def debug_routes():
+    """Rota de diagnóstico para conferir se o Render carregou a versão certa."""
+    rotas = []
+
+    for rule in app.url_map.iter_rules():
+        rotas.append({
+            "endpoint": rule.endpoint,
+            "methods": sorted(list(rule.methods)),
+            "rule": str(rule)
+        })
+
+    return jsonify(sorted(rotas, key=lambda item: item["rule"]))
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -125,6 +309,12 @@ def login():
     return render_template("login.html")
 
 
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+
 @app.route("/admin")
 def admin():
     if not session.get("admin"):
@@ -135,6 +325,10 @@ def admin():
 
     return render_template("admin.html", drivers=drivers, orders=orders)
 
+
+# =========================
+# MOTOBOYS
+# =========================
 
 @app.route("/motoboys/novo", methods=["POST"])
 def novo_motoboy():
@@ -166,62 +360,6 @@ def desativar_motoboy(id):
     return redirect("/admin")
 
 
-@app.route("/pedidos/novo", methods=["POST"])
-def novo_pedido():
-    if not session.get("admin"):
-        return redirect("/login")
-
-    qr_token = secrets.token_urlsafe(32)
-    tracking_token = secrets.token_urlsafe(32)
-
-    novo = Order(
-        numero_pedido=request.form.get("numero_pedido"),
-        cliente_nome=request.form.get("cliente_nome"),
-        cliente_email=request.form.get("cliente_email"),
-        telefone=request.form.get("telefone"),
-        endereco=request.form.get("endereco"),
-        taxa_entrega=float(request.form.get("taxa_entrega") or 0),
-        qr_token=qr_token,
-        tracking_token=tracking_token,
-        status="PRONTO"
-    )
-
-    db.session.add(novo)
-    db.session.commit()
-
-    gerar_qrcode(novo)
-
-    return redirect("/admin")
-
-
-def gerar_qrcode(order):
-    pasta = "qr_codes"
-    os.makedirs(pasta, exist_ok=True)
-
-    base_url = os.environ.get("BASE_URL", "http://127.0.0.1:6061")
-    link = f"{base_url}/motoboy/scan/{order.qr_token}"
-
-    img = qrcode.make(link)
-    caminho = os.path.join(pasta, f"pedido_{order.id}.png")
-    img.save(caminho)
-
-
-@app.route("/pedido/<int:id>/qr")
-def ver_qr(id):
-    if not session.get("admin"):
-        return redirect("/login")
-
-    order = Order.query.get_or_404(id)
-    qr_path = f"/qr_codes/pedido_{order.id}.png"
-
-    return render_template("qr.html", order=order, qr_path=qr_path)
-
-
-@app.route("/qr_codes/<filename>")
-def servir_qrcode(filename):
-    return send_from_directory("qr_codes", filename)
-
-
 @app.route("/motoboy/scan/<token>", methods=["GET", "POST"])
 def scan_pedido(token):
     order = Order.query.filter_by(qr_token=token).first_or_404()
@@ -250,30 +388,11 @@ def scan_pedido(token):
 
         order.status = "EM_ROTA"
 
-
-
         db.session.add(entrega)
         db.session.flush()
 
-        ultima_rota = DeliveryRouteItem.query.filter_by(
-            driver_id=driver.id,
-            status="PENDENTE"
-        ).order_by(DeliveryRouteItem.route_order.desc()).first()
+        criar_item_rota(driver, order, entrega)
 
-        proxima_ordem = 1
-
-        if ultima_rota:
-            proxima_ordem = ultima_rota.route_order + 1
-
-        rota_item = DeliveryRouteItem(
-            delivery_id=entrega.id,
-            driver_id=driver.id,
-            order_id=order.id,
-            route_order=proxima_ordem,
-            status="PENDENTE"
-        )
-
-        db.session.add(rota_item)
         db.session.commit()
 
         return render_template(
@@ -286,13 +405,67 @@ def scan_pedido(token):
     return render_template("motoboy_scan.html", order=order, drivers=drivers)
 
 
+@app.route("/motoboy/app/<int:driver_id>")
+def motoboy_app_teste(driver_id):
+    driver = Driver.query.get_or_404(driver_id)
+    return render_template("motoboy_app.html", driver=driver)
+
+
+# =========================
+# PEDIDOS MANUAIS / QR
+# =========================
+
+@app.route("/pedidos/novo", methods=["POST"])
+def novo_pedido():
+    if not session.get("admin"):
+        return redirect("/login")
+
+    qr_token = secrets.token_urlsafe(32)
+    tracking_token = secrets.token_urlsafe(32)
+
+    novo = Order(
+        numero_pedido=request.form.get("numero_pedido"),
+        cliente_nome=request.form.get("cliente_nome"),
+        cliente_email=request.form.get("cliente_email"),
+        telefone=request.form.get("telefone"),
+        endereco=request.form.get("endereco"),
+        taxa_entrega=get_float(request.form.get("taxa_entrega")),
+        qr_token=qr_token,
+        tracking_token=tracking_token,
+        status="PRONTO"
+    )
+
+    db.session.add(novo)
+    db.session.commit()
+
+    gerar_qrcode(novo)
+
+    return redirect("/admin")
+
+
+@app.route("/pedido/<int:id>/qr")
+def ver_qr(id):
+    if not session.get("admin"):
+        return redirect("/login")
+
+    order = Order.query.get_or_404(id)
+    qr_path = f"/qr_codes/pedido_{order.id}.png"
+
+    return render_template("qr.html", order=order, qr_path=qr_path)
+
+
+@app.route("/qr_codes/<filename>")
+def servir_qrcode(filename):
+    return send_from_directory("qr_codes", filename)
+
+
 # =========================
 # APIs DO APP DO MOTOBOY
 # =========================
 
 @app.route("/api/driver/login", methods=["POST"])
 def api_driver_login():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
 
     telefone = data.get("telefone")
     senha = data.get("senha")
@@ -320,7 +493,7 @@ def api_driver_login():
 
 @app.route("/api/driver/scan", methods=["POST"])
 def api_driver_scan():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
 
     driver_id = data.get("driver_id")
     qr_token = data.get("qr_token")
@@ -360,25 +533,8 @@ def api_driver_scan():
     db.session.add(entrega)
     db.session.flush()
 
-    ultima_rota = DeliveryRouteItem.query.filter_by(
-        driver_id=driver.id,
-        status="PENDENTE"
-    ).order_by(DeliveryRouteItem.route_order.desc()).first()
+    criar_item_rota(driver, order, entrega)
 
-    proxima_ordem = 1
-
-    if ultima_rota:
-        proxima_ordem = ultima_rota.route_order + 1
-
-    rota_item = DeliveryRouteItem(
-        delivery_id=entrega.id,
-        driver_id=driver.id,
-        order_id=order.id,
-        route_order=proxima_ordem,
-        status="PENDENTE"
-    )
-
-    db.session.add(rota_item)
     db.session.commit()
 
     return jsonify({
@@ -398,7 +554,7 @@ def api_driver_scan():
 
 @app.route("/api/driver/location", methods=["POST"])
 def api_driver_location():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
 
     driver_id = data.get("driver_id")
     latitude = data.get("latitude")
@@ -461,7 +617,7 @@ def api_driver_deliveries(driver_id):
 
 @app.route("/api/driver/finish", methods=["POST"])
 def api_driver_finish():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
 
     delivery_id = data.get("delivery_id")
     driver_id = data.get("driver_id")
@@ -482,12 +638,20 @@ def api_driver_finish():
     entrega.horario_entrega = datetime.now()
     entrega.order.status = "ENTREGUE"
 
+    for item in entrega.route_items:
+        item.status = "ENTREGUE"
+
     db.session.commit()
 
     return jsonify({
         "success": True,
         "message": "Entrega finalizada."
     })
+
+
+# =========================
+# ADMIN: MAPA, ENTREGAS, RELATÓRIOS, ROTAS
+# =========================
 
 @app.route("/admin/mapa")
 def admin_mapa():
@@ -526,6 +690,8 @@ def api_admin_locations():
         "success": True,
         "drivers": resultado
     })
+
+
 @app.route("/admin/entregas")
 def admin_entregas():
     if not session.get("admin"):
@@ -555,6 +721,34 @@ def admin_relatorio():
         })
 
     return render_template("admin_relatorio.html", relatorio=relatorio)
+
+
+@app.route("/admin/rotas")
+def admin_rotas():
+    if not session.get("admin"):
+        return redirect("/login")
+
+    drivers = Driver.query.filter_by(ativo=True).all()
+    rotas = []
+
+    for driver in drivers:
+        itens = DeliveryRouteItem.query.filter_by(
+            driver_id=driver.id,
+            status="PENDENTE"
+        ).order_by(DeliveryRouteItem.route_order.asc()).all()
+
+        rotas.append({
+            "driver": driver,
+            "itens": itens
+        })
+
+    return render_template("admin_rotas.html", rotas=rotas)
+
+
+# =========================
+# IMPRESSÃO 58MM
+# =========================
+
 @app.route("/print/qr/<int:id>")
 def print_qr_58mm(id):
     if not session.get("admin"):
@@ -581,10 +775,25 @@ def print_relatorio_58mm(driver_id):
         entregas=entregas,
         total_taxas=total_taxas
     )
+
+
+@app.route("/print/cozinha/<int:order_id>")
+def print_cozinha_58mm(order_id):
+    if not session.get("admin"):
+        return redirect("/login")
+
+    order = YampiOrder.query.get_or_404(order_id)
+
+    return render_template("print/cozinha_58mm.html", order=order)
+
+
+# =========================
+# RASTREIO DO CLIENTE
+# =========================
+
 @app.route("/rastreio/<token>")
 def rastreio_cliente(token):
     order = Order.query.filter_by(tracking_token=token).first_or_404()
-
     entrega = Delivery.query.filter_by(order_id=order.id).order_by(Delivery.id.desc()).first()
 
     return render_template(
@@ -597,7 +806,6 @@ def rastreio_cliente(token):
 @app.route("/api/rastreio/<token>")
 def api_rastreio_cliente(token):
     order = Order.query.filter_by(tracking_token=token).first_or_404()
-
     entrega = Delivery.query.filter_by(order_id=order.id).order_by(Delivery.id.desc()).first()
 
     if not entrega:
@@ -624,38 +832,256 @@ def api_rastreio_cliente(token):
         "ultima_atualizacao": ultima.criado_em.strftime("%H:%M:%S") if ultima else None,
         "eta_texto": "Aproximadamente 15 a 25 minutos"
     })
-@app.route("/motoboy/app/<int:driver_id>")
-def motoboy_app_teste(driver_id):
-    driver = Driver.query.get_or_404(driver_id)
-    return render_template("motoboy_app.html", driver=driver)
 
-@app.route("/admin/rotas")
-def admin_rotas():
+
+# =========================
+# COZINHA / YAMPI
+# =========================
+
+@app.route("/admin/cozinha")
+def admin_cozinha():
     if not session.get("admin"):
         return redirect("/login")
 
-    drivers = Driver.query.filter_by(ativo=True).all()
+    orders = YampiOrder.query.order_by(YampiOrder.created_at.desc()).limit(100).all()
 
-    rotas = []
+    return render_template("admin_cozinha.html", orders=orders)
 
-    for driver in drivers:
-        itens = DeliveryRouteItem.query.filter_by(
-            driver_id=driver.id,
-            status="PENDENTE"
-        ).order_by(DeliveryRouteItem.route_order.asc()).all()
 
-        rotas.append({
-            "driver": driver,
-            "itens": itens
+@app.route("/api/yampi/sync")
+def sync_yampi_orders():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "error": "Não autorizado"}), 401
+
+    try:
+        url = f"{get_yampi_base_url()}/orders"
+
+        response = requests.get(
+            url,
+            headers=yampi_headers(),
+            timeout=20
+        )
+
+        if not response.ok:
+            return jsonify({
+                "ok": False,
+                "status_code": response.status_code,
+                "error": response.text
+            }), response.status_code
+
+        data = response.json()
+        orders = data.get("data", [])
+
+        saved = 0
+        saved_ids = []
+
+        for item in orders:
+            yampi_id = str(item.get("id") or "")
+
+            if not yampi_id:
+                continue
+
+            existing = YampiOrder.query.filter_by(yampi_id=yampi_id).first()
+
+            if existing:
+                continue
+
+            detail_item = item
+
+            try:
+                detail_url = f"{get_yampi_base_url()}/orders/{yampi_id}"
+                detail_response = requests.get(
+                    detail_url,
+                    headers=yampi_headers(),
+                    timeout=20
+                )
+
+                if detail_response.ok:
+                    detail_json = detail_response.json()
+                    detail_item = detail_json.get("data") or item
+            except Exception:
+                detail_item = item
+
+            customer = get_nested_data(item.get("customer"))
+            payment = get_nested_data(item.get("payment"))
+            shipping = get_nested_data(item.get("shipping_address"))
+
+            customer_name = (
+                customer.get("name")
+                or item.get("customer_name")
+                or "Cliente não identificado"
+            )
+
+            customer_phone = extract_text(
+                customer.get("phone")
+                or customer.get("whatsapp")
+                or item.get("phone")
+                or ""
+            )
+
+            customer_email = customer.get("email") or ""
+
+            customer_document = extract_text(
+                customer.get("document")
+                or customer.get("cpf")
+                or item.get("document")
+                or item.get("customer_document")
+                or item.get("cpf")
+                or ""
+            )
+
+            street = shipping.get("street", "")
+            number = shipping.get("number", "")
+            neighborhood = shipping.get("neighborhood", "")
+            city = shipping.get("city", "")
+            state = shipping.get("state", "")
+            zipcode = shipping.get("zipcode", "")
+
+            customer_address = (
+                f"{street}, {number}\n"
+                f"{neighborhood}\n"
+                f"{city} - {state}\n"
+                f"CEP: {zipcode}"
+            ).strip()
+
+            payment_status = extract_text(
+                payment.get("status")
+                or item.get("payment_status")
+                or item.get("status")
+                or ""
+            )
+
+            payment_method = extract_text(
+                item.get("payment_method")
+                or payment.get("method")
+                or payment.get("name")
+                or ""
+            )
+
+            total = get_float(
+                item.get("total")
+                or item.get("value_total")
+                or item.get("value_total_paid")
+                or item.get("value_products")
+                or 0
+            )
+
+            delivery_fee = get_float(
+                detail_item.get("value_shipment")
+                or detail_item.get("shipment_cost")
+                or detail_item.get("value_shipping")
+                or detail_item.get("shipping_price")
+                or 0
+            )
+
+            items = get_order_items_from_yampi(yampi_id)
+
+            qr_token = secrets.token_urlsafe(32)
+            tracking_token = secrets.token_urlsafe(32)
+
+            mototrack_order = Order(
+                numero_pedido=yampi_id,
+                cliente_nome=customer_name,
+                cliente_email=customer_email,
+                telefone=customer_phone,
+                endereco=customer_address or "Endereço não informado",
+                taxa_entrega=delivery_fee,
+                qr_token=qr_token,
+                tracking_token=tracking_token,
+                status="PRONTO"
+            )
+
+            db.session.add(mototrack_order)
+            db.session.flush()
+
+            yampi_order = YampiOrder(
+                yampi_id=yampi_id,
+                mototrack_order_id=mototrack_order.id,
+                customer_name=customer_name,
+                customer_phone=customer_phone,
+                customer_email=customer_email,
+                customer_document=customer_document,
+                customer_address=customer_address,
+                items_json=items,
+                total=total,
+                delivery_fee=delivery_fee,
+                payment_status=payment_status,
+                payment_method=payment_method,
+                order_status="novo",
+                raw_json=detail_item
+            )
+
+            db.session.add(yampi_order)
+            db.session.commit()
+
+            gerar_qrcode(mototrack_order)
+
+            saved += 1
+            saved_ids.append(yampi_order.id)
+
+        return jsonify({
+            "ok": True,
+            "saved": saved,
+            "saved_ids": saved_ids,
+            "total_received": len(orders)
         })
 
-    return render_template("admin_rotas.html", rotas=rotas)
+    except Exception as e:
+        db.session.rollback()
 
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect("/login")
+        return jsonify({
+            "ok": False,
+            "error": str(e)
+        }), 500
 
+
+@app.route("/api/kitchen/orders")
+def api_kitchen_orders():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "error": "Não autorizado"}), 401
+
+    orders = YampiOrder.query.order_by(YampiOrder.created_at.desc()).limit(100).all()
+
+    return jsonify([
+        {
+            "id": order.id,
+            "yampi_id": order.yampi_id,
+            "customer_name": order.customer_name,
+            "customer_phone": order.customer_phone,
+            "total": order.total,
+            "delivery_fee": order.delivery_fee,
+            "payment_status": order.payment_status,
+            "payment_method": order.payment_method,
+            "local_payment_method": order.local_payment_method,
+            "order_status": order.order_status,
+            "notes": order.notes,
+            "created_at": order.created_at.strftime("%H:%M:%S") if order.created_at else ""
+        }
+        for order in orders
+    ])
+
+
+@app.route("/api/kitchen/orders/<int:order_id>/status", methods=["POST"])
+def update_kitchen_order_status(order_id):
+    if not session.get("admin"):
+        return jsonify({"ok": False, "error": "Não autorizado"}), 401
+
+    order = YampiOrder.query.get_or_404(order_id)
+    data = request.get_json(silent=True) or {}
+
+    order.order_status = data.get("order_status", order.order_status)
+    order.local_payment_method = data.get("local_payment_method", order.local_payment_method)
+    order.notes = data.get("notes", order.notes)
+    order.updated_at = datetime.now()
+
+    db.session.commit()
+
+    return jsonify({"ok": True})
+
+
+# =========================
+# INICIALIZAÇÃO
+# =========================
 
 with app.app_context():
     db.create_all()
