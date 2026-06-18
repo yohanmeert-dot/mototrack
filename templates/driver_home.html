@@ -48,7 +48,21 @@
         <section class="driver-card">
             <h2>Mapa da rota</h2>
             <div id="googleDriverMap"></div>
-            <div id="routeSummary">Rota ainda não carregada.</div>
+
+	    <div class="driver-actions" style="margin-top: 12px;">
+  	      <button onclick="iniciarNavegacaoInterna()">🧭 Iniciar rota</button>
+  	      <button class="btn-light" onclick="recalcularNavegacao()">Recalcular</button>
+	    </div>
+
+	    <div id="routeSummary">Rota ainda não carregada.</div>
+
+    	<div id="navigationPanel" class="navigation-panel">
+  	      <h3>Navegação</h3>
+  	      <p id="navDestino">Destino: ---</p>
+	      <p id="navTempo">Tempo: ---</p>
+   	      <p id="navDistancia">Distância: ---</p>
+	      <div id="navSteps">Inicie uma rota para ver as instruções.</div>
+	</div>
         </section>
 
         <section class="driver-card">
@@ -77,6 +91,8 @@ let directionsRenderer = null;
 
 let qrScanner = null;
 let scannerRunning = false;
+let navegacaoAtiva = false;
+let destinoAtual = null;
 
 function initGoogleDriverMap() {
     const defaultCenter = { lat: -25.095, lng: -50.161 };
@@ -167,7 +183,9 @@ async function enviarLocalizacao(position) {
         googleMap.setCenter(currentLatLng);
     }
 
+    if (!navegacaoAtiva) {
     desenharRotaAtual();
+}
 }
 
 function erroGPS(error) {
@@ -268,6 +286,92 @@ function desenharRotaAtual() {
             } else {
                 document.getElementById("routeSummary").innerText =
                     "Não foi possível calcular rota: " + status;
+            }
+        }
+    );
+}
+
+function iniciarNavegacaoInterna() {
+    const route = window.currentRoute || [];
+
+    if (route.length === 0) {
+        alert("Nenhum pedido em rota.");
+        return;
+    }
+
+    if (!currentLatLng) {
+        alert("Inicie o GPS antes de iniciar a rota.");
+        return;
+    }
+
+    destinoAtual = route[0];
+    navegacaoAtiva = true;
+
+    calcularNavegacaoParaDestino(destinoAtual);
+}
+
+function recalcularNavegacao() {
+    if (!destinoAtual) {
+        iniciarNavegacaoInterna();
+        return;
+    }
+
+    if (!currentLatLng) {
+        alert("GPS ainda não está ativo.");
+        return;
+    }
+
+    calcularNavegacaoParaDestino(destinoAtual);
+}
+
+function calcularNavegacaoParaDestino(destino) {
+    if (!directionsService || !directionsRenderer) {
+        alert("Mapa ainda não carregou.");
+        return;
+    }
+
+    document.getElementById("navDestino").innerText =
+        "Destino: Pedido #" + destino.numero_pedido + " - " + destino.cliente_nome;
+
+    directionsService.route(
+        {
+            origin: currentLatLng,
+            destination: destino.endereco,
+            travelMode: google.maps.TravelMode.DRIVING
+        },
+        function(result, status) {
+            if (status === "OK") {
+                directionsRenderer.setDirections(result);
+
+                const leg = result.routes[0].legs[0];
+
+                document.getElementById("navTempo").innerText =
+                    "Tempo: " + leg.duration.text;
+
+                document.getElementById("navDistancia").innerText =
+                    "Distância: " + leg.distance.text;
+
+                let stepsHtml = "<ol>";
+
+                leg.steps.forEach(step => {
+                    stepsHtml += `
+                        <li>
+                            ${step.instructions}
+                            <br>
+                            <small>${step.distance.text} - ${step.duration.text}</small>
+                        </li>
+                    `;
+                });
+
+                stepsHtml += "</ol>";
+
+                document.getElementById("navSteps").innerHTML = stepsHtml;
+
+                document.getElementById("routeSummary").innerText =
+                    "Navegação iniciada até o pedido #" + destino.numero_pedido;
+            } else {
+                document.getElementById("routeSummary").innerText =
+                    "Erro ao calcular navegação: " + status;
             }
         }
     );
@@ -385,7 +489,15 @@ async function finalizarEntrega(deliveryId) {
     });
 
     alert("Entrega finalizada!");
-    carregarRota();
+
+    navegacaoAtiva = false;
+    destinoAtual = null;
+
+    await carregarRota();
+
+    setTimeout(() => {
+        iniciarNavegacaoInterna();
+    }, 1000);
 }
 </script>
 

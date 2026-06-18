@@ -803,3 +803,37 @@ tbody td:last-child {
         flex-direction: column;
     }
 }
+.navigation-panel {
+    margin-top: 14px;
+    background: #f8fafc;
+    border: 1px solid #dbeafe;
+    border-radius: 18px;
+    padding: 16px;
+}
+
+.navigation-panel h3 {
+    margin-top: 0;
+}
+
+#navSteps {
+    max-height: 260px;
+    overflow-y: auto;
+    background: white;
+    border-radius: 14px;
+    padding: 12px;
+    margin-top: 10px;
+}
+
+#navSteps ol {
+    padding-left: 20px;
+}
+
+#navSteps li {
+    margin-bottom: 12px;
+    line-height: 1.4;
+}
+
+#navSteps small {
+    color: #64748b;
+    font-weight: 700;
+}
