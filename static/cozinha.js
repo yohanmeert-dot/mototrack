@@ -199,4 +199,46 @@ async function updateOrder(orderId, payload) {
 }
 
 loadKitchenOrders(false);
-setInterval(() => syncYampiOrders(null), 5000);
+setInterval(autoCheckNewOrders, 5000);
+async function autoCheckNewOrders() {
+    if (syncingNow) return;
+
+    const focused = document.activeElement;
+
+    const userIsEditing =
+        focused &&
+        (
+            focused.tagName === "TEXTAREA" ||
+            focused.tagName === "INPUT" ||
+            focused.tagName === "SELECT"
+        );
+
+    syncingNow = true;
+
+    try {
+        const response = await fetch("/api/yampi/sync");
+        const data = await response.json();
+
+        if (data.ok && data.saved > 0) {
+            playBellSound();
+
+            if (!userIsEditing) {
+                await loadKitchenOrders(true);
+            } else {
+                document.getElementById("syncStatus").innerText =
+                    "Pedido novo chegou. Termine a edição e atualize.";
+            }
+        } else {
+            document.getElementById("syncStatus").innerText =
+                "Sem pedidos novos.";
+        }
+
+        updateLastUpdate();
+
+    } catch (e) {
+        document.getElementById("syncStatus").innerText =
+            "Erro ao verificar novos pedidos.";
+    }
+
+    syncingNow = false;
+}

@@ -155,7 +155,15 @@ async function enviarLocalizacao(position) {
     });
 
     if (driverMarker) {
-        driverMarker.setPosition(currentLatLng);
+    	driverMarker.setPosition(currentLatLng);
+    } else {
+        driverMarker = new google.maps.Marker({
+            position: currentLatLng,
+            map: googleMap,
+            title: "Você",
+            label: "M"
+        });
+
         googleMap.setCenter(currentLatLng);
     }
 
