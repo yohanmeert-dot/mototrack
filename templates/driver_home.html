@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <title>MotoTrack Driver</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <link rel="stylesheet" href="/static/style.css">
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 </head>
 
 <body class="driver-body">
@@ -20,16 +21,34 @@
     </header>
 
     <main class="driver-container">
-        <section class="driver-card">
-            <h2>Localização</h2>
+
+        <section class="driver-card driver-main-status">
+            <h2>Operação</h2>
 
             <div class="driver-actions">
-                <button onclick="iniciarGPS()">Iniciar GPS</button>
+                <button onclick="iniciarGPS()">📍 Iniciar GPS</button>
                 <button class="btn-light" onclick="pararGPS()">Parar GPS</button>
             </div>
 
             <p id="gpsStatus">GPS parado.</p>
             <p class="small">Mantenha esta tela aberta durante as entregas.</p>
+        </section>
+
+        <section class="driver-card">
+            <h2>Escanear pedido</h2>
+
+            <button onclick="abrirScanner()">📷 Ler QR Code</button>
+            <button class="btn-light" onclick="fecharScanner()">Fechar câmera</button>
+
+            <div id="qr-reader"></div>
+
+            <p id="scanStatus">Aguardando leitura...</p>
+        </section>
+
+        <section class="driver-card">
+            <h2>Mapa da rota</h2>
+            <div id="googleDriverMap"></div>
+            <div id="routeSummary">Rota ainda não carregada.</div>
         </section>
 
         <section class="driver-card">
@@ -42,25 +61,48 @@
             </div>
         </section>
 
-        <section class="driver-card">
-            <h2>Mapa</h2>
-            <div id="driverMap"></div>
-        </section>
     </main>
 
 <script>
 const driverId = {{ driver.id }};
+const GOOGLE_MAPS_API_KEY = "{{ google_maps_api_key }}";
+
 let watchId = null;
-let map = null;
+let currentLatLng = null;
+
+let googleMap = null;
 let driverMarker = null;
-let orderMarkers = [];
+let directionsService = null;
+let directionsRenderer = null;
 
-function iniciarMapa() {
-    map = L.map("driverMap").setView([-25.095, -50.161], 13);
+let qrScanner = null;
+let scannerRunning = false;
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19
-    }).addTo(map);
+function initGoogleDriverMap() {
+    const defaultCenter = { lat: -25.095, lng: -50.161 };
+
+    googleMap = new google.maps.Map(document.getElementById("googleDriverMap"), {
+        zoom: 14,
+        center: defaultCenter,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: true
+    });
+
+    directionsService = new google.maps.DirectionsService();
+    directionsRenderer = new google.maps.DirectionsRenderer({
+        map: googleMap,
+        suppressMarkers: false
+    });
+
+    driverMarker = new google.maps.Marker({
+        position: defaultCenter,
+        map: googleMap,
+        title: "Você",
+        label: "M"
+    });
+
+    carregarRota();
 }
 
 function iniciarGPS() {
@@ -95,6 +137,8 @@ async function enviarLocalizacao(position) {
     const lat = position.coords.latitude;
     const lng = position.coords.longitude;
 
+    currentLatLng = { lat: lat, lng: lng };
+
     document.getElementById("gpsStatus").innerText =
         "GPS ativo: " + lat.toFixed(5) + ", " + lng.toFixed(5);
 
@@ -110,15 +154,12 @@ async function enviarLocalizacao(position) {
         })
     });
 
-    const pos = [lat, lng];
-
     if (driverMarker) {
-        driverMarker.setLatLng(pos);
-    } else {
-        driverMarker = L.marker(pos).addTo(map).bindPopup("Você");
+        driverMarker.setPosition(currentLatLng);
+        googleMap.setCenter(currentLatLng);
     }
 
-    map.setView(pos, 15);
+    desenharRotaAtual();
 }
 
 function erroGPS(error) {
@@ -132,13 +173,13 @@ async function carregarRota() {
 
     const container = document.getElementById("driverRouteList");
 
-    orderMarkers.forEach(marker => map.removeLayer(marker));
-    orderMarkers = [];
-
     if (!data.success || !data.route || data.route.length === 0) {
         container.innerHTML = "<p>Nenhum pedido em rota.</p>";
+        document.getElementById("routeSummary").innerText = "Nenhum pedido em rota.";
         return;
     }
+
+    window.currentRoute = data.route;
 
     let html = "";
 
@@ -157,22 +198,71 @@ async function carregarRota() {
                 <p><strong>Total:</strong> R$ ${Number(item.total || 0).toFixed(2)}</p>
 
                 <div class="driver-items">
-                    <strong>Itens:</strong>
+                    <strong>Itens para conferir:</strong>
                     ${renderItens(item.items)}
                 </div>
 
-                <button onclick="abrirGoogleMaps('${encodeURIComponent(item.endereco || "")}')">
-                    Abrir no Google Maps
-                </button>
-
                 <button class="btn-done" onclick="finalizarEntrega(${item.delivery_id})">
-                    Finalizar entrega
+                    ✅ Finalizar entrega
                 </button>
             </div>
         `;
     });
 
     container.innerHTML = html;
+
+    desenharRotaAtual();
+}
+
+function desenharRotaAtual() {
+    if (!directionsService || !directionsRenderer) return;
+
+    const route = window.currentRoute || [];
+
+    if (!currentLatLng || route.length === 0) {
+        return;
+    }
+
+    const waypoints = route.slice(0, -1).map(item => ({
+        location: item.endereco,
+        stopover: true
+    }));
+
+    const destination = route[route.length - 1].endereco;
+
+    directionsService.route(
+        {
+            origin: currentLatLng,
+            destination: destination,
+            waypoints: waypoints,
+            travelMode: google.maps.TravelMode.DRIVING,
+            optimizeWaypoints: false
+        },
+        function(result, status) {
+            if (status === "OK") {
+                directionsRenderer.setDirections(result);
+
+                let totalSeconds = 0;
+                let totalMeters = 0;
+
+                const legs = result.routes[0].legs;
+
+                legs.forEach(leg => {
+                    totalSeconds += leg.duration.value;
+                    totalMeters += leg.distance.value;
+                });
+
+                const minutos = Math.round(totalSeconds / 60);
+                const km = (totalMeters / 1000).toFixed(1);
+
+                document.getElementById("routeSummary").innerText =
+                    "Rota: " + km + " km | Tempo estimado: " + minutos + " min";
+            } else {
+                document.getElementById("routeSummary").innerText =
+                    "Não foi possível calcular rota: " + status;
+            }
+        }
+    );
 }
 
 function renderItens(items) {
@@ -197,8 +287,77 @@ function renderItens(items) {
     return html;
 }
 
-function abrirGoogleMaps(endereco) {
-    window.open("https://www.google.com/maps/search/?api=1&query=" + endereco, "_blank");
+function extrairTokenDoQr(decodedText) {
+    try {
+        const url = new URL(decodedText);
+        const partes = url.pathname.split("/");
+        return partes[partes.length - 1];
+    } catch (e) {
+        return decodedText;
+    }
+}
+
+function abrirScanner() {
+    if (scannerRunning) return;
+
+    qrScanner = new Html5Qrcode("qr-reader");
+
+    qrScanner.start(
+        { facingMode: "environment" },
+        {
+            fps: 10,
+            qrbox: { width: 240, height: 240 }
+        },
+        async function(decodedText) {
+            const token = extrairTokenDoQr(decodedText);
+            await despacharPedidoPorQr(token);
+        },
+        function(errorMessage) {}
+    ).then(() => {
+        scannerRunning = true;
+        document.getElementById("scanStatus").innerText = "Câmera aberta. Aponte para o QR Code.";
+    }).catch(err => {
+        document.getElementById("scanStatus").innerText = "Erro ao abrir câmera: " + err;
+    });
+}
+
+function fecharScanner() {
+    if (qrScanner && scannerRunning) {
+        qrScanner.stop().then(() => {
+            scannerRunning = false;
+            document.getElementById("scanStatus").innerText = "Câmera fechada.";
+        });
+    }
+}
+
+async function despacharPedidoPorQr(qrToken) {
+    document.getElementById("scanStatus").innerText = "Despachando pedido...";
+
+    const response = await fetch("/api/driver/scan", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            driver_id: driverId,
+            qr_token: qrToken
+        })
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+        document.getElementById("scanStatus").innerText =
+            "Pedido #" + data.order.numero_pedido + " saiu para entrega.";
+
+        fecharScanner();
+        alert("Pedido despachado com sucesso!");
+
+        await carregarRota();
+    } else {
+        document.getElementById("scanStatus").innerText = data.message || "Erro ao despachar.";
+        alert(data.message || "Erro ao despachar pedido.");
+    }
 }
 
 async function finalizarEntrega(deliveryId) {
@@ -220,9 +379,10 @@ async function finalizarEntrega(deliveryId) {
     alert("Entrega finalizada!");
     carregarRota();
 }
+</script>
 
-iniciarMapa();
-carregarRota();
+<script async defer
+    src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initGoogleDriverMap">
 </script>
 
 </body>

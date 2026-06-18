@@ -467,8 +467,13 @@ def driver_home_web():
         return redirect("/driver/login")
 
     driver = Driver.query.get_or_404(driver_id)
+    google_maps_api_key = os.environ.get("GOOGLE_MAPS_API_KEY", "")
 
-    return render_template("driver_home.html", driver=driver)
+    return render_template(
+        "driver_home.html",
+        driver=driver,
+        google_maps_api_key=google_maps_api_key
+    )
 
 
 @app.route("/driver/logout")
