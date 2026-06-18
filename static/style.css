@@ -497,3 +497,130 @@ tbody td:last-child {
         grid-template-columns: 1fr;
     }
 }
+/* =========================
+   DRIVER WEB APP
+========================= */
+
+.driver-body {
+    background: #0f172a;
+    min-height: 100vh;
+    margin: 0;
+}
+
+.driver-header {
+    background: linear-gradient(135deg, #111827, #020617);
+    color: white;
+    padding: 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.driver-header h1 {
+    margin: 0;
+    font-size: 22px;
+}
+
+.driver-header p {
+    margin: 4px 0 0;
+    color: #cbd5e1;
+}
+
+.driver-header a {
+    background: white;
+    color: #111827;
+    padding: 9px 14px;
+    border-radius: 999px;
+    font-weight: 800;
+}
+
+.driver-container {
+    max-width: 620px;
+    margin: auto;
+    padding: 16px;
+}
+
+.driver-card,
+.driver-login-card {
+    background: white;
+    border-radius: 22px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 14px 35px rgba(0,0,0,0.25);
+}
+
+.driver-login-card {
+    max-width: 380px;
+    margin: 70px auto;
+}
+
+.driver-login-card h1 {
+    margin-bottom: 4px;
+}
+
+.driver-login-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.driver-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.btn-light {
+    background: #e5e7eb;
+    color: #111827;
+}
+
+#driverMap {
+    width: 100%;
+    height: 420px;
+    border-radius: 18px;
+}
+
+.driver-order-card {
+    border: 1px solid #e5e7eb;
+    background: #f8fafc;
+    border-radius: 18px;
+    padding: 16px;
+    margin-top: 14px;
+}
+
+.driver-order-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.driver-order-top strong {
+    font-size: 17px;
+}
+
+.driver-order-top span {
+    background: #dbeafe;
+    color: #1d4ed8;
+    padding: 5px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 900;
+}
+
+.driver-items {
+    background: white;
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+.driver-items ul {
+    padding-left: 18px;
+}
+
+.btn-done {
+    margin-top: 8px;
+    background: #16a34a;
+}

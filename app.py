@@ -428,6 +428,56 @@ def api_driver_order_detail(order_id):
         }
     })
 
+# =========================
+# DRIVER WEB APP
+# =========================
+
+@app.route("/driver")
+def driver_root():
+    return redirect("/driver/login")
+
+
+@app.route("/driver/login", methods=["GET", "POST"])
+def driver_login_web():
+    if request.method == "POST":
+        telefone = request.form.get("telefone")
+        senha = request.form.get("senha")
+
+        driver = Driver.query.filter_by(telefone=telefone, ativo=True).first()
+
+        if not driver or not check_password_hash(driver.senha, senha):
+            return render_template(
+                "driver_login.html",
+                erro="Telefone ou senha inválidos."
+            )
+
+        session["driver_id"] = driver.id
+        session["driver_name"] = driver.nome
+
+        return redirect("/driver/home")
+
+    return render_template("driver_login.html")
+
+
+@app.route("/driver/home")
+def driver_home_web():
+    driver_id = session.get("driver_id")
+
+    if not driver_id:
+        return redirect("/driver/login")
+
+    driver = Driver.query.get_or_404(driver_id)
+
+    return render_template("driver_home.html", driver=driver)
+
+
+@app.route("/driver/logout")
+def driver_logout_web():
+    session.pop("driver_id", None)
+    session.pop("driver_name", None)
+
+    return redirect("/driver/login")
+
 @app.route("/logout")
 def logout():
     session.clear()

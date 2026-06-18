@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>MotoTrack Driver</title>
+    <link rel="stylesheet" href="/static/style.css">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+</head>
+
+<body class="driver-body">
+    <header class="driver-header">
+        <div>
+            <h1>MotoTrack Driver</h1>
+            <p>{{ driver.nome }}</p>
+        </div>
+
+        <a href="/driver/logout">Sair</a>
+    </header>
+
+    <main class="driver-container">
+        <section class="driver-card">
+            <h2>Localização</h2>
+
+            <div class="driver-actions">
+                <button onclick="iniciarGPS()">Iniciar GPS</button>
+                <button class="btn-light" onclick="pararGPS()">Parar GPS</button>
+            </div>
+
+            <p id="gpsStatus">GPS parado.</p>
+            <p class="small">Mantenha esta tela aberta durante as entregas.</p>
+        </section>
+
+        <section class="driver-card">
+            <h2>Minha rota</h2>
+
+            <button onclick="carregarRota()">Atualizar rota</button>
+
+            <div id="driverRouteList" class="driver-route-list">
+                Carregando rota...
+            </div>
+        </section>
+
+        <section class="driver-card">
+            <h2>Mapa</h2>
+            <div id="driverMap"></div>
+        </section>
+    </main>
+
+<script>
+const driverId = {{ driver.id }};
+let watchId = null;
+let map = null;
+let driverMarker = null;
+let orderMarkers = [];
+
+function iniciarMapa() {
+    map = L.map("driverMap").setView([-25.095, -50.161], 13);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19
+    }).addTo(map);
+}
+
+function iniciarGPS() {
+    if (!navigator.geolocation) {
+        alert("GPS não disponível neste celular.");
+        return;
+    }
+
+    document.getElementById("gpsStatus").innerText = "Solicitando permissão do GPS...";
+
+    watchId = navigator.geolocation.watchPosition(
+        enviarLocalizacao,
+        erroGPS,
+        {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 10000
+        }
+    );
+}
+
+function pararGPS() {
+    if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+    }
+
+    document.getElementById("gpsStatus").innerText = "GPS parado.";
+}
+
+async function enviarLocalizacao(position) {
+    const lat = position.coords.latitude;
+    const lng = position.coords.longitude;
+
+    document.getElementById("gpsStatus").innerText =
+        "GPS ativo: " + lat.toFixed(5) + ", " + lng.toFixed(5);
+
+    await fetch("/api/driver/location", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            driver_id: driverId,
+            latitude: lat,
+            longitude: lng
+        })
+    });
+
+    const pos = [lat, lng];
+
+    if (driverMarker) {
+        driverMarker.setLatLng(pos);
+    } else {
+        driverMarker = L.marker(pos).addTo(map).bindPopup("Você");
+    }
+
+    map.setView(pos, 15);
+}
+
+function erroGPS(error) {
+    document.getElementById("gpsStatus").innerText =
+        "Erro no GPS: " + error.message;
+}
+
+async function carregarRota() {
+    const response = await fetch("/api/driver/route/" + driverId);
+    const data = await response.json();
+
+    const container = document.getElementById("driverRouteList");
+
+    orderMarkers.forEach(marker => map.removeLayer(marker));
+    orderMarkers = [];
+
+    if (!data.success || !data.route || data.route.length === 0) {
+        container.innerHTML = "<p>Nenhum pedido em rota.</p>";
+        return;
+    }
+
+    let html = "";
+
+    data.route.forEach(item => {
+        html += `
+            <div class="driver-order-card">
+                <div class="driver-order-top">
+                    <strong>${item.route_order}º - Pedido #${item.numero_pedido}</strong>
+                    <span>${item.status}</span>
+                </div>
+
+                <p><strong>Cliente:</strong> ${item.cliente_nome || "-"}</p>
+                <p><strong>Telefone:</strong> ${item.telefone || "-"}</p>
+                <p><strong>Endereço:</strong><br>${(item.endereco || "-").replaceAll("\\n", "<br>")}</p>
+                <p><strong>Taxa:</strong> R$ ${Number(item.taxa_entrega || 0).toFixed(2)}</p>
+                <p><strong>Total:</strong> R$ ${Number(item.total || 0).toFixed(2)}</p>
+
+                <div class="driver-items">
+                    <strong>Itens:</strong>
+                    ${renderItens(item.items)}
+                </div>
+
+                <button onclick="abrirGoogleMaps('${encodeURIComponent(item.endereco || "")}')">
+                    Abrir no Google Maps
+                </button>
+
+                <button class="btn-done" onclick="finalizarEntrega(${item.delivery_id})">
+                    Finalizar entrega
+                </button>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+function renderItens(items) {
+    if (!items || items.length === 0) {
+        return "<p>Nenhum item encontrado.</p>";
+    }
+
+    let html = "<ul>";
+
+    items.forEach(item => {
+        html += `<li><strong>${item.quantity}x ${item.name}</strong>`;
+
+        if (item.customizations && item.customizations.length > 0) {
+            html += "<br><small>" + item.customizations.join("<br>") + "</small>";
+        }
+
+        html += "</li>";
+    });
+
+    html += "</ul>";
+
+    return html;
+}
+
+function abrirGoogleMaps(endereco) {
+    window.open("https://www.google.com/maps/search/?api=1&query=" + endereco, "_blank");
+}
+
+async function finalizarEntrega(deliveryId) {
+    if (!confirm("Confirmar entrega finalizada?")) {
+        return;
+    }
+
+    await fetch("/api/driver/finish", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            delivery_id: deliveryId,
+            driver_id: driverId
+        })
+    });
+
+    alert("Entrega finalizada!");
+    carregarRota();
+}
+
+iniciarMapa();
+carregarRota();
+</script>
+
+</body>
+</html>
