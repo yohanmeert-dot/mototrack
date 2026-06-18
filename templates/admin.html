@@ -78,6 +78,7 @@
                         <th>Taxa</th>
                         <th>Status</th>
                         <th>QR</th>
+          		<th>Ver QR Code</th>
                         <th>Rastreio</th>
                         <th>Mensagem</th>
                     </tr>
@@ -97,7 +98,11 @@
                                 Imprimir
                             </button>
                         </td>
-
+			<td>
+    				<button class="small-btn light" onclick="verQrCode('{{ order.id }}', '{{ order.numero_pedido }}')">
+     				    Ver QR Code
+  			        </button>
+			</td>
                         <td>
                             <a class="small-link" href="/rastreio/{{ order.tracking_token }}" target="_blank">
                                 Abrir
@@ -167,7 +172,66 @@
 
 <iframe id="printFrame" style="display:none;"></iframe>
 
+
 <script>
+function verQrCode(orderId, numeroPedido) {
+    const imgUrl = "/qr_codes/pedido_" + orderId + ".png";
+
+    const janela = window.open("", "QR Code", "width=420,height=520");
+
+    janela.document.write(`
+        <html>
+        <head>
+            <title>QR Code Pedido #${numeroPedido}</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    background: #f3f4f6;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 100vh;
+                    margin: 0;
+                }
+
+                .card {
+                    background: white;
+                    padding: 28px;
+                    border-radius: 20px;
+                    text-align: center;
+                    box-shadow: 0 12px 32px rgba(0,0,0,.15);
+                }
+
+                img {
+                    width: 280px;
+                    height: 280px;
+                    margin: 20px 0;
+                }
+
+                button {
+                    border: none;
+                    background: #111827;
+                    color: white;
+                    padding: 12px 18px;
+                    border-radius: 12px;
+                    cursor: pointer;
+                    font-weight: bold;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <h2>Pedido #${numeroPedido}</h2>
+                <img src="${imgUrl}">
+                <br>
+                <button onclick="window.close()">Fechar</button>
+            </div>
+        </body>
+        </html>
+    `);
+
+    janela.document.close();
+}
 function imprimirIframe(url) {
     const frame = document.getElementById("printFrame");
     frame.src = url;
