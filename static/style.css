@@ -837,3 +837,20 @@ tbody td:last-child {
     color: #64748b;
     font-weight: 700;
 }
+.navigation-overlay {
+    display: none;
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    z-index: 99999;
+}
+
+.nav-start-btn {
+    background: #16a34a !important;
+    color: white !important;
+    font-size: 20px !important;
+    padding: 18px 26px !important;
+    border-radius: 999px !important;
+    box-shadow: 0 12px 30px rgba(0,0,0,.35);
+}

@@ -5,115 +5,151 @@
 <title>Pedido Cozinha 58mm</title>
 
 <style>
+@page {
+    size: 58mm auto;
+    margin: 0;
+}
+
 @media print {
-    @page {
-        size: 58mm auto;
-        margin: 0;
+    html,
+    body {
+        width: 58mm;
+        margin: 0 !important;
+        padding: 0 !important;
     }
 }
 
+html,
 body {
     width: 58mm;
-    margin: 0;
-    padding: 4mm 3mm;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+}
+
+body {
     font-family: Arial, sans-serif;
-    font-size: 12px;
+    font-size: 11px;
     color: #000;
 }
 
-.center { text-align: center; }
-.big { font-size: 15px; font-weight: bold; }
-.bold { font-weight: bold; }
-.small { font-size: 10px; }
+.receipt {
+    width: 54mm;
+    margin: 0 auto;
+    padding: 2mm 1mm 4mm 1mm;
+}
+
+.center {
+    text-align: center;
+}
+
+.big {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.bold {
+    font-weight: bold;
+}
+
+.small {
+    font-size: 9px;
+}
 
 hr {
     border: none;
     border-top: 1px dashed #000;
-    margin: 7px 0;
+    margin: 5px 0;
 }
 
 .item {
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .qr {
-    width: 34mm;
-    height: 34mm;
+    width: 32mm;
+    height: 32mm;
+}
+
+* {
+    box-sizing: border-box;
 }
 </style>
 </head>
 
 <body>
+<div class="receipt">
 
-<div class="center">
-    <div class="big">CANTINHO DO ALEMÃO</div>
-    <div class="bold">PEDIDO COZINHA</div>
-    <div class="small">MotoTrack Delivery</div>
-</div>
+    <div class="center">
+        <div class="big">CANTINHO DO ALEMÃO</div>
+        <div class="bold">PEDIDO COZINHA</div>
+        <div class="small">MotoTrack Delivery</div>
+    </div>
 
-<hr>
+    <hr>
 
-<div>
-    <strong>Pedido:</strong> #{{ order.yampi_id }}<br>
-    <strong>Cliente:</strong> {{ order.customer_name }}<br>
-    <strong>Telefone:</strong> {{ order.customer_phone or "-" }}<br>
-    <strong>CPF:</strong> {{ order.customer_document or "-" }}<br>
-</div>
+    <div>
+        <strong>Pedido:</strong> #{{ order.yampi_id }}<br>
+        <strong>Cliente:</strong> {{ order.customer_name }}<br>
+        <strong>Telefone:</strong> {{ order.customer_phone or "-" }}<br>
+        <strong>CPF:</strong> {{ order.customer_document or "-" }}<br>
+    </div>
 
-<hr>
+    <hr>
 
-<div>
-    <strong>Endereço:</strong><br>
-    {{ order.customer_address or "-" }}
-</div>
+    <div>
+        <strong>Endereço:</strong><br>
+        {{ order.customer_address or "-" }}
+    </div>
 
-<hr>
+    <hr>
 
-<div class="bold center">ITENS DO PEDIDO</div>
+    <div class="bold center">ITENS DO PEDIDO</div>
 
-{% for item in order.items_json or [] %}
-<div class="item">
-    <strong>{{ item.quantity }}x {{ item.name }}</strong><br>
+    {% for item in order.items_json or [] %}
+    <div class="item">
+        <strong>{{ item.quantity }}x {{ item.name }}</strong><br>
 
-    {% if item.customizations %}
-        {% for c in item.customizations %}
-            - {{ c }}<br>
-        {% endfor %}
+        {% if item.customizations %}
+            {% for c in item.customizations %}
+                - {{ c }}<br>
+            {% endfor %}
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    <hr>
+
+    <div>
+        <strong>Pagamento:</strong> {{ order.local_payment_method or order.payment_method or "-" }}<br>
+        <strong>Status pgto:</strong> {{ order.payment_status or "-" }}<br>
+        <strong>Taxa entrega:</strong> R$ {{ "%.2f"|format(order.delivery_fee or 0) }}<br>
+        <strong>Total:</strong> R$ {{ "%.2f"|format(order.total or 0) }}<br>
+    </div>
+
+    {% if order.notes %}
+    <hr>
+    <div>
+        <strong>Observações:</strong><br>
+        {{ order.notes }}
+    </div>
     {% endif %}
+
+    {% if order.mototrack_order %}
+    <hr>
+    <div class="center">
+        <div class="bold">QR DO MOTOBOY</div>
+        <img class="qr" src="/qr_codes/pedido_{{ order.mototrack_order.id }}.png">
+        <div class="small">Escanear para dar saída</div>
+    </div>
+    {% endif %}
+
+    <hr>
+
+    <div class="center small">
+        Impresso pelo MotoTrack
+    </div>
+
 </div>
-{% endfor %}
-
-<hr>
-
-<div>
-    <strong>Pagamento:</strong> {{ order.local_payment_method or order.payment_method or "-" }}<br>
-    <strong>Status pgto:</strong> {{ order.payment_status or "-" }}<br>
-    <strong>Taxa entrega:</strong> R$ {{ "%.2f"|format(order.delivery_fee or 0) }}<br>
-    <strong>Total:</strong> R$ {{ "%.2f"|format(order.total or 0) }}<br>
-</div>
-
-{% if order.notes %}
-<hr>
-<div>
-    <strong>Observações:</strong><br>
-    {{ order.notes }}
-</div>
-{% endif %}
-
-{% if order.mototrack_order %}
-<hr>
-<div class="center">
-    <div class="bold">QR DO MOTOBOY</div>
-    <img class="qr" src="/qr_codes/pedido_{{ order.mototrack_order.id }}.png">
-    <div class="small">Escanear para dar saída</div>
-</div>
-{% endif %}
-
-<hr>
-
-<div class="center small">
-    Impresso pelo MotoTrack
-</div>
-
 </body>
 </html>

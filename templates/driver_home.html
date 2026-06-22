@@ -49,10 +49,18 @@
             <h2>Mapa da rota</h2>
             <div id="googleDriverMap"></div>
 
-	    <div class="driver-actions" style="margin-top: 12px;">
-  	      <button onclick="iniciarNavegacaoInterna()">🧭 Iniciar rota</button>
-  	      <button class="btn-light" onclick="recalcularNavegacao()">Recalcular</button>
-	    </div>
+	    <div id="googleDriverMap"></div>
+
+        <div class="driver-actions" style="margin-top: 12px;">
+            <button onclick="abrirModoRota()">🧭 Abrir rota</button>
+            <button class="btn-light" onclick="recalcularNavegacao()">Recalcular</button>
+        </div>
+
+        <div id="navigationOverlay" class="navigation-overlay">
+            <button onclick="iniciarNavegacaoInterna()" class="nav-start-btn">
+                INICIAR NAVEGAÇÃO
+            </button>
+        </div>
 
 	    <div id="routeSummary">Rota ainda não carregada.</div>
 
@@ -77,6 +85,15 @@
 
     </main>
 
+    async function abrirModoRota() {
+    const elemento = document.getElementById("googleDriverMap");
+
+    if (elemento && elemento.requestFullscreen) {
+        await elemento.requestFullscreen();
+    }
+
+    document.getElementById("navigationOverlay").style.display = "block";
+}
 <script>
 const driverId = {{ driver.id }};
 const GOOGLE_MAPS_API_KEY = "{{ google_maps_api_key }}";
@@ -138,7 +155,7 @@ function iniciarGPS() {
         {
             enableHighAccuracy: true,
             maximumAge: 0,
-            timeout: 10000
+            timeout: 3000 
         }
     );
 }
@@ -265,7 +282,7 @@ function desenharRotaAtual() {
             destination: destination,
             waypoints: waypoints,
             travelMode: google.maps.TravelMode.DRIVING,
-            optimizeWaypoints: false
+            optimizeWaypoints: true
         },
         function(result, status) {
             if (status === "OK") {
@@ -561,6 +578,16 @@ async function finalizarEntrega(deliveryId) {
 
 <script async defer
     src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&callback=initGoogleDriverMap">
+
+    async function abrirModoRota() {
+    const elemento = document.getElementById("googleDriverMap");
+
+    if (elemento && elemento.requestFullscreen) {
+        await elemento.requestFullscreen();
+    }
+
+    document.getElementById("navigationOverlay").style.display = "block";
+}
 </script>
 
 </body>
