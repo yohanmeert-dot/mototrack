@@ -1391,13 +1391,24 @@ def sync_futura_orders():
                 "codigo": payload.get("codigo")
             }), 400
 
-        pedidos = payload.get("data", [])
+        data = payload.get("data", [])
+
+if isinstance(data, dict):
+    pedidos = data.get("itens") or data.get("items") or list(data.values())
+elif isinstance(data, list):
+    pedidos = data
+else:
+    pedidos = []
 
         saved = 0
         ignored = 0
 
         for pedido in pedidos:
-            futura_id = str(pedido.get("id"))
+    if not isinstance(pedido, dict):
+        ignored += 1
+        continue
+
+    futura_id = str(pedido.get("id") or "")
 
             if not futura_id:
                 ignored += 1
@@ -1413,6 +1424,9 @@ def sync_futura_orders():
 
             cliente = pedido.get("cliente") or {}
 
+if not isinstance(cliente, dict):
+    cliente = {}
+
             endereco_completo = (
                 f"{cliente.get('endereco', '')}, {cliente.get('numero', '')}\n"
                 f"{cliente.get('bairro', '')}\n"
@@ -1424,7 +1438,14 @@ def sync_futura_orders():
 
             itens = []
 
-            for item in pedido.get("itens", []):
+            itens_pedido = pedido.get("itens", [])
+
+if not isinstance(itens_pedido, list):
+    itens_pedido = []
+
+for item in itens_pedido:
+    if not isinstance(item, dict):
+        continue
                 customizations = []
 
                 if item.get("complementos"):
