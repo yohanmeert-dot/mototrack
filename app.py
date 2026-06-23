@@ -6,7 +6,9 @@ import secrets
 import os
 import qrcode
 import requests
+import os 
 
+FUTURA_API_KEY = os.environ.get("FUTURA_API_KEY", "")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "mototrack_secret_key")
@@ -480,6 +482,79 @@ def driver_home_web():
         google_maps_api_key=google_maps_api_key
     )
 
+def validar_api_key(req):
+    token = req.headers.get("Authorization", "")
+
+    if token.startswith("Bearer "):
+        token = token.replace("Bearer ", "")
+
+    return token == FUTURA_API_KEY
+
+    @app.route("/api/public/orders", methods=["GET"])
+def api_public_orders():
+
+    if not validar_api_key(request):
+        return jsonify({
+            "success": False,
+            "message": "Não autorizado."
+        }), 401
+
+    pedidos = YampiOrder.query.order_by(
+        YampiOrder.id.desc()
+    ).limit(100).all()
+
+    resultado = []
+
+    for order in pedidos:
+
+        resultado.append({
+            "id": order.id,
+            "numero_pedido": order.yampi_id,
+            "cliente_nome": order.customer_name,
+            "telefone": order.customer_phone,
+            "cpf": order.customer_document,
+            "endereco": order.customer_address,
+            "items": order.items_json,
+            "pagamento": order.local_payment_method or order.payment_method,
+            "status_pagamento": order.payment_status,
+            "taxa_entrega": order.delivery_fee,
+            "total": order.total,
+            "observacoes": order.notes
+        })
+
+    return jsonify({
+        "success": True,
+        "count": len(resultado),
+        "orders": resultado
+    })
+
+    @app.route("/api/public/orders/<int:order_id>", methods=["GET"])
+def api_public_order(order_id):
+
+    if not validar_api_key(request):
+        return jsonify({
+            "success": False
+        }), 401
+
+    order = YampiOrder.query.get_or_404(order_id)
+
+    return jsonify({
+        "success": True,
+        "order": {
+            "id": order.id,
+            "numero_pedido": order.yampi_id,
+            "cliente_nome": order.customer_name,
+            "telefone": order.customer_phone,
+            "cpf": order.customer_document,
+            "endereco": order.customer_address,
+            "items": order.items_json,
+            "pagamento": order.local_payment_method or order.payment_method,
+            "status_pagamento": order.payment_status,
+            "taxa_entrega": order.delivery_fee,
+            "total": order.total,
+            "observacoes": order.notes
+        }
+    })
 
 @app.route("/driver/logout")
 def driver_logout_web():
