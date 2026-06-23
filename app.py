@@ -1369,11 +1369,7 @@ def sync_futura_orders():
     try:
         url = f"{futura_base_url()}/pedidos.php?novos=1"
 
-        response = requests.get(
-            url,
-            auth=futura_auth(),
-            timeout=20
-        )
+        response = requests.get(url, auth=futura_auth(), timeout=20)
 
         if not response.ok:
             return jsonify({
@@ -1403,12 +1399,12 @@ def sync_futura_orders():
         saved = 0
         ignored = 0
 
-        for pedido in pedidos:
-            if not isinstance(pedido, dict):
+        for pedido_resumido in pedidos:
+            if not isinstance(pedido_resumido, dict):
                 ignored += 1
                 continue
 
-            futura_id = str(pedido.get("id") or "")
+            futura_id = str(pedido_resumido.get("id") or "")
 
             if not futura_id:
                 ignored += 1
@@ -1422,10 +1418,35 @@ def sync_futura_orders():
                 ignored += 1
                 continue
 
+            # BUSCA O PEDIDO COMPLETO
+            detail_url = f"{futura_base_url()}/pedidos.php?id={futura_id}"
+            detail_response = requests.get(detail_url, auth=futura_auth(), timeout=20)
+
+            if not detail_response.ok:
+                ignored += 1
+                continue
+
+            detail_payload = detail_response.json()
+
+            if not detail_payload.get("ok"):
+                ignored += 1
+                continue
+
+            pedido = detail_payload.get("data") or {}
+
+            if not isinstance(pedido, dict):
+                ignored += 1
+                continue
+
             cliente = pedido.get("cliente") or {}
 
             if not isinstance(cliente, dict):
                 cliente = {}
+
+            # FILTRO: apenas delivery
+            if pedido.get("tipo_servico") and pedido.get("tipo_servico") != "D":
+                ignored += 1
+                continue
 
             endereco_completo = (
                 f"{cliente.get('endereco', '')}, {cliente.get('numero', '')}\n"
@@ -1456,7 +1477,7 @@ def sync_futura_orders():
                     customizations.append("Obs: " + item.get("observacoes"))
 
                 itens.append({
-                    "name": item.get("nome_produto"),
+                    "name": item.get("nome_produto") or "Produto",
                     "quantity": int(item.get("qtde") or 1),
                     "price": get_float(item.get("preco")),
                     "customizations": customizations,
@@ -1496,7 +1517,7 @@ def sync_futura_orders():
                 payment_status=pedido.get("status_pagamento"),
                 payment_method=pedido.get("forma_pagto_descricao"),
                 order_status="novo",
-                notes=pedido.get("motivo_recusa") or "",
+                notes="",
                 raw_json=pedido
             )
 
