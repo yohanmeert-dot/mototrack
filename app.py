@@ -1393,22 +1393,22 @@ def sync_futura_orders():
 
         data = payload.get("data", [])
 
-if isinstance(data, dict):
-    pedidos = data.get("itens") or data.get("items") or list(data.values())
-elif isinstance(data, list):
-    pedidos = data
-else:
-    pedidos = []
+        if isinstance(data, dict):
+            pedidos = data.get("itens") or data.get("items") or data.get("pedidos") or []
+        elif isinstance(data, list):
+            pedidos = data
+        else:
+            pedidos = []
 
         saved = 0
         ignored = 0
 
         for pedido in pedidos:
-    if not isinstance(pedido, dict):
-        ignored += 1
-        continue
+            if not isinstance(pedido, dict):
+                ignored += 1
+                continue
 
-    futura_id = str(pedido.get("id") or "")
+            futura_id = str(pedido.get("id") or "")
 
             if not futura_id:
                 ignored += 1
@@ -1424,8 +1424,8 @@ else:
 
             cliente = pedido.get("cliente") or {}
 
-if not isinstance(cliente, dict):
-    cliente = {}
+            if not isinstance(cliente, dict):
+                cliente = {}
 
             endereco_completo = (
                 f"{cliente.get('endereco', '')}, {cliente.get('numero', '')}\n"
@@ -1440,12 +1440,13 @@ if not isinstance(cliente, dict):
 
             itens_pedido = pedido.get("itens", [])
 
-if not isinstance(itens_pedido, list):
-    itens_pedido = []
+            if not isinstance(itens_pedido, list):
+                itens_pedido = []
 
-for item in itens_pedido:
-    if not isinstance(item, dict):
-        continue
+            for item in itens_pedido:
+                if not isinstance(item, dict):
+                    continue
+
                 customizations = []
 
                 if item.get("complementos"):
@@ -1457,7 +1458,7 @@ for item in itens_pedido:
                 itens.append({
                     "name": item.get("nome_produto"),
                     "quantity": int(item.get("qtde") or 1),
-                    "price": float(item.get("preco") or 0),
+                    "price": get_float(item.get("preco")),
                     "customizations": customizations,
                     "codigo_pdv": item.get("codigo_pdv"),
                     "observacoes": item.get("observacoes")
