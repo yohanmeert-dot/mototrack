@@ -482,17 +482,23 @@ def driver_home_web():
         google_maps_api_key=google_maps_api_key
     )
 
+# =========================
+# API PÚBLICA FUTURASYSTEM
+# =========================
+
 def validar_api_key(req):
     token = req.headers.get("Authorization", "")
 
     if token.startswith("Bearer "):
         token = token.replace("Bearer ", "")
 
-    return token == FUTURA_API_KEY
+    futura_api_key = os.environ.get("FUTURA_API_KEY", "")
 
-    @app.route("/api/public/orders", methods=["GET"])
+    return bool(futura_api_key) and token == futura_api_key
+
+
+@app.route("/api/public/orders", methods=["GET"])
 def api_public_orders():
-
     if not validar_api_key(request):
         return jsonify({
             "success": False,
@@ -506,7 +512,6 @@ def api_public_orders():
     resultado = []
 
     for order in pedidos:
-
         resultado.append({
             "id": order.id,
             "numero_pedido": order.yampi_id,
@@ -519,7 +524,10 @@ def api_public_orders():
             "status_pagamento": order.payment_status,
             "taxa_entrega": order.delivery_fee,
             "total": order.total,
-            "observacoes": order.notes
+            "observacoes": order.notes,
+            "status": order.order_status,
+            "criado_em": order.created_at.strftime("%Y-%m-%d %H:%M:%S") if order.created_at else None,
+            "atualizado_em": order.updated_at.strftime("%Y-%m-%d %H:%M:%S") if order.updated_at else None
         })
 
     return jsonify({
@@ -528,12 +536,13 @@ def api_public_orders():
         "orders": resultado
     })
 
-    @app.route("/api/public/orders/<int:order_id>", methods=["GET"])
-def api_public_order(order_id):
 
+@app.route("/api/public/orders/<int:order_id>", methods=["GET"])
+def api_public_order(order_id):
     if not validar_api_key(request):
         return jsonify({
-            "success": False
+            "success": False,
+            "message": "Não autorizado."
         }), 401
 
     order = YampiOrder.query.get_or_404(order_id)
@@ -552,7 +561,10 @@ def api_public_order(order_id):
             "status_pagamento": order.payment_status,
             "taxa_entrega": order.delivery_fee,
             "total": order.total,
-            "observacoes": order.notes
+            "observacoes": order.notes,
+            "status": order.order_status,
+            "criado_em": order.created_at.strftime("%Y-%m-%d %H:%M:%S") if order.created_at else None,
+            "atualizado_em": order.updated_at.strftime("%Y-%m-%d %H:%M:%S") if order.updated_at else None
         }
     })
 
