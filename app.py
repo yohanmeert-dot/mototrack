@@ -134,6 +134,18 @@ def gerar_qrcode(order):
     caminho = os.path.join(pasta, f"pedido_{order.id}.png")
     img.save(caminho)
 
+def futura_auth():
+    return (
+        os.environ.get("FUTURA_API_USER", ""),
+        os.environ.get("FUTURA_API_PASSWORD", "")
+    )
+
+
+def futura_base_url():
+    return os.environ.get(
+        "FUTURA_BASE_URL",
+        "https://cantinhodoalemao.futurasystem.com.br/api"
+    ).rstrip("/")
 
 def criar_item_rota(driver, order, entrega):
     ultima_rota = DeliveryRouteItem.query.filter_by(
@@ -1349,6 +1361,144 @@ def update_kitchen_order_status(order_id):
 
     return jsonify({"ok": True})
 
+@app.route("/api/futura/sync")
+def sync_futura_orders():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "error": "Não autorizado"}), 401
+
+    try:
+        url = f"{futura_base_url()}/pedidos.php?novos=1"
+
+        response = requests.get(
+            url,
+            auth=futura_auth(),
+            timeout=20
+        )
+
+        if not response.ok:
+            return jsonify({
+                "ok": False,
+                "status_code": response.status_code,
+                "error": response.text
+            }), response.status_code
+
+        payload = response.json()
+
+        if not payload.get("ok"):
+            return jsonify({
+                "ok": False,
+                "error": payload.get("erro", "Erro desconhecido na FuturaSystem"),
+                "codigo": payload.get("codigo")
+            }), 400
+
+        pedidos = payload.get("data", [])
+
+        saved = 0
+        ignored = 0
+
+        for pedido in pedidos:
+            futura_id = str(pedido.get("id"))
+
+            if not futura_id:
+                ignored += 1
+                continue
+
+            existing = YampiOrder.query.filter_by(
+                yampi_id=f"FUTURA-{futura_id}"
+            ).first()
+
+            if existing:
+                ignored += 1
+                continue
+
+            cliente = pedido.get("cliente") or {}
+
+            endereco_completo = (
+                f"{cliente.get('endereco', '')}, {cliente.get('numero', '')}\n"
+                f"{cliente.get('bairro', '')}\n"
+                f"{cliente.get('cidade', '')} - {cliente.get('uf', '')}\n"
+                f"CEP: {cliente.get('cep', '')}\n"
+                f"Complemento: {cliente.get('complemento', '')}\n"
+                f"Referência: {cliente.get('proximidade', '')}"
+            ).strip()
+
+            itens = []
+
+            for item in pedido.get("itens", []):
+                customizations = []
+
+                if item.get("complementos"):
+                    customizations.append(item.get("complementos"))
+
+                if item.get("observacoes"):
+                    customizations.append("Obs: " + item.get("observacoes"))
+
+                itens.append({
+                    "name": item.get("nome_produto"),
+                    "quantity": int(item.get("qtde") or 1),
+                    "price": float(item.get("preco") or 0),
+                    "customizations": customizations,
+                    "codigo_pdv": item.get("codigo_pdv"),
+                    "observacoes": item.get("observacoes")
+                })
+
+            qr_token = secrets.token_urlsafe(32)
+            tracking_token = secrets.token_urlsafe(32)
+
+            mototrack_order = Order(
+                numero_pedido=f"FUTURA-{futura_id}",
+                cliente_nome=cliente.get("nome") or "Cliente FuturaSystem",
+                cliente_email=cliente.get("email"),
+                telefone=cliente.get("telefone"),
+                endereco=endereco_completo or "Endereço não informado",
+                taxa_entrega=get_float(pedido.get("taxa_entrega")),
+                qr_token=qr_token,
+                tracking_token=tracking_token,
+                status="PRONTO"
+            )
+
+            db.session.add(mototrack_order)
+            db.session.flush()
+
+            futura_order = YampiOrder(
+                yampi_id=f"FUTURA-{futura_id}",
+                mototrack_order_id=mototrack_order.id,
+                customer_name=cliente.get("nome") or "Cliente FuturaSystem",
+                customer_phone=cliente.get("telefone"),
+                customer_email=cliente.get("email"),
+                customer_document=cliente.get("cpf"),
+                customer_address=endereco_completo,
+                items_json=itens,
+                total=get_float(pedido.get("total_liquido")),
+                delivery_fee=get_float(pedido.get("taxa_entrega")),
+                payment_status=pedido.get("status_pagamento"),
+                payment_method=pedido.get("forma_pagto_descricao"),
+                order_status="novo",
+                notes=pedido.get("motivo_recusa") or "",
+                raw_json=pedido
+            )
+
+            db.session.add(futura_order)
+            db.session.commit()
+
+            gerar_qrcode(mototrack_order)
+
+            saved += 1
+
+        return jsonify({
+            "ok": True,
+            "source": "futurasystem",
+            "received": len(pedidos),
+            "saved": saved,
+            "ignored": ignored
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "ok": False,
+            "error": str(e)
+        }), 500
 
 # =========================
 # INICIALIZAÇÃO
